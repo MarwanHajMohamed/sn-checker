@@ -29,7 +29,10 @@
   input[type=text],input[type=number],select{
     font:inherit;padding:9px 10px;border:1px solid var(--line);border-radius:8px;background:#fff;color:inherit}
   input[type=text]:focus,input[type=number]:focus,select:focus{outline:2px solid var(--brand);outline-offset:0;border-color:var(--brand)}
-  #scanBox{font-size:20px;letter-spacing:.5px;padding:14px 14px;width:100%}
+  #scanBox{font-size:20px;letter-spacing:.5px;padding:14px 14px;width:100%;transition:background .1s,border-color .1s}
+  #scanBox.flash{background:var(--ok-bg);border-color:var(--ok)}
+  .autohint{margin:10px 0 0;font-size:13px;color:var(--ok)}
+  .autohint .ver{color:var(--muted);font-weight:600;margin-left:6px}
   .scanwrap{display:flex;gap:10px}
   .scanwrap input{flex:1}
   button{font:inherit;font-weight:600;padding:10px 14px;border:1px solid var(--line);border-radius:8px;
@@ -83,6 +86,7 @@
         <button class="primary" type="submit">Add</button>
       </div>
     </form>
+    <p class="autohint">✓ Auto-add is on — just scan, no need to press <b>Add</b>. <span class="ver">v2</span></p>
     <div class="row" style="margin-top:12px">
       <div class="field">
         <label for="trailN">Keep last … characters</label>
@@ -318,6 +322,8 @@ https://github.com/nodeca/pako/blob/main/LICENSE
     scans.push({ raw:raw, code:code, time:new Date().toISOString() });
     save(); render();
     showToast("Added: " + code);
+    scanBox.classList.add("flash");
+    setTimeout(function(){ scanBox.classList.remove("flash"); }, 150);
   }
 
   // Commit the current scan box contents. Called both when the scanner sends
@@ -335,8 +341,16 @@ https://github.com/nodeca/pako/blob/main/LICENSE
     e.preventDefault();
     commitScan();
   });
-  // Scanners type the whole code in a fast burst; add it automatically once
-  // typing pauses. A real Enter fires submit first and cancels this timer.
+  // Some scanners end a scan with Enter, some with Tab, some with nothing.
+  // Handle Enter/Tab explicitly so any suffix commits immediately...
+  scanBox.addEventListener("keydown", function(e){
+    if(e.key === "Enter" || e.key === "Tab"){
+      e.preventDefault();
+      commitScan();
+    }
+  });
+  // ...and for scanners that send NO suffix, auto-commit once the fast burst
+  // of typing pauses, so you never have to press "Add".
   scanBox.addEventListener("input", function(){
     clearTimeout(autoTimer);
     autoTimer = setTimeout(commitScan, 140);
