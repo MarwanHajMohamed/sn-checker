@@ -134,7 +134,14 @@
           <input id="headerRow" type="number" min="1" value="1" style="width:100px">
         </div>
         <div class="field">
-          <label for="colSel">Column with the codes</label>
+          <label for="matchMode">Match when</label>
+          <select id="matchMode">
+            <option value="contains" selected>Cell contains the code</option>
+            <option value="exact">Cell exactly equals the code</option>
+          </select>
+        </div>
+        <div class="field">
+          <label for="colSel">Look in</label>
           <select id="colSel"></select>
         </div>
         <div class="field">
@@ -485,6 +492,9 @@ https://github.com/nodeca/pako/blob/main/LICENSE
     var hr = parseInt(headerRow.value, 10) || 1;
     var row = ws.getRow(hr);
     var maxCol = Math.max(ws.columnCount || 0, row.cellCount || 0, 1);
+    var anyOpt = document.createElement("option");
+    anyOpt.value = "0"; anyOpt.textContent = "Any column — whole row";
+    colSel.appendChild(anyOpt);
     for(var c = 1; c <= maxCol; c++){
       var name = cellString(row.getCell(c)).trim();
       var label = colLetter(c) + (name ? " — " + name : "");
@@ -492,6 +502,7 @@ https://github.com/nodeca/pako/blob/main/LICENSE
       opt.value = c; opt.textContent = label;
       colSel.appendChild(opt);
     }
+    colSel.value = "0"; // default: search the whole row
   }
   sheetSel.addEventListener("change", populateColumns);
   headerRow.addEventListener("change", populateColumns);
@@ -508,34 +519,57 @@ https://github.com/nodeca/pako/blob/main/LICENSE
     if(!codes.length){ showToast("No scanned codes to match"); return; }
 
     var ws = currentSheet();
-    var col = parseInt(colSel.value, 10) || 1;
+    var searchCol = parseInt(colSel.value, 10) || 0; // 0 = any column / whole row
     var startRow = parseInt(dataStart.value, 10) || 2;
+    var mode = $("matchMode").value;                 // "contains" | "exact"
 
-    // build a lookup of normalized code -> original code (for the "not found" report)
+    // normalized codes (for both the match test and the "not found" report)
+    var normCodes = codes.map(function(c){ return { code:c, norm:normalize(c) }; })
+                         .filter(function(o){ return o.norm; });
     var codeSet = Object.create(null);
-    codes.forEach(function(c){ codeSet[normalize(c)] = c; });
+    normCodes.forEach(function(o){ codeSet[o.norm] = o.code; });
     var foundSet = Object.create(null);
 
     var argb = "FF" + $("hlColor").value.replace("#","").toUpperCase();
     var fill = { type:"pattern", pattern:"solid", fgColor:{ argb:argb } };
     var wholeRow = $("wholeRow").checked;
 
-    // determine width to paint when highlighting whole row
     var lastCol = Math.max(ws.columnCount || 0,
-                           ws.getRow(parseInt(headerRow.value,10)||1).cellCount || 0, col);
+                           ws.getRow(parseInt(headerRow.value,10)||1).cellCount || 0,
+                           searchCol, 1);
+
+    // decide which columns to inspect on each row
+    function rowMatchCells(row){
+      var cells = [];
+      var from = searchCol ? searchCol : 1;
+      var to   = searchCol ? searchCol : lastCol;
+      for(var c = from; c <= to; c++){
+        var val = normalize(cellString(row.getCell(c)));
+        if(!val) continue;
+        var hit = false;
+        if(mode === "exact"){
+          if(val in codeSet){ foundSet[val] = true; hit = true; }
+        } else { // contains: does this cell contain any scanned code?
+          for(var k = 0; k < normCodes.length; k++){
+            if(val.indexOf(normCodes[k].norm) !== -1){ foundSet[normCodes[k].norm] = true; hit = true; }
+          }
+        }
+        if(hit) cells.push(c);
+      }
+      return cells;
+    }
 
     var highlighted = 0;
     var lastRow = ws.rowCount || 0;
     for(var r = startRow; r <= lastRow; r++){
       var row = ws.getRow(r);
-      var val = normalize(cellString(row.getCell(col)));
-      if(val && (val in codeSet)){
-        foundSet[val] = true;
+      var cells = rowMatchCells(row);
+      if(cells.length){
         highlighted++;
         if(wholeRow){
           for(var c = 1; c <= lastCol; c++){ row.getCell(c).fill = fill; }
         } else {
-          row.getCell(col).fill = fill;
+          cells.forEach(function(c){ row.getCell(c).fill = fill; });
         }
         row.commit && row.commit();
       }
@@ -553,7 +587,7 @@ https://github.com/nodeca/pako/blob/main/LICENSE
                  'matching <b>'+matchedCodes+'</b> of your '+codes.length+' code(s). '+
                  'Downloaded as <code class="k">'+esc(outName)+'</code>.</div>';
       if(notFound.length){
-        html += '<div class="note"><b>'+notFound.length+'</b> scanned code(s) were not found in that column:'+
+        html += '<div class="note"><b>'+notFound.length+'</b> scanned code(s) were not found:'+
                 '<ul>'+ notFound.slice(0,50).map(function(c){ return "<li>"+esc(c)+"</li>"; }).join("") +
                 (notFound.length>50 ? "<li>… and "+(notFound.length-50)+" more</li>" : "") + '</ul></div>';
       }

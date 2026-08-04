@@ -31,13 +31,20 @@ contacts any website — you can use it with the network unplugged.
 
 **Step 2 — Highlight matches in Excel**
 
-- Load your `.xlsx` file and pick the worksheet and the column that holds the
-  codes.
-- Every row whose value in that column **exactly matches** one of your scanned
-  codes gets highlighted (whole row, colour of your choice — yellow by default).
+- Load your `.xlsx` file and pick the worksheet.
+- Choose how to match:
+  - **Match when** — *Cell contains the code* (default) highlights a row when
+    the code appears **anywhere inside** a cell's value, so it works even when
+    the sheet stores longer strings around the code. *Cell exactly equals the
+    code* requires a whole-cell match.
+  - **Look in** — *Any column (whole row)* (default) searches every column, or
+    pick a single column to restrict the search.
+- Every matching row gets highlighted (whole row, colour of your choice —
+  yellow by default). Untick "Highlight the whole row" to colour only the
+  matching cell instead.
 - You download a **new** highlighted copy — your original file is never changed.
 - A short report tells you how many rows were highlighted and lists any scanned
-  codes that were **not** found in the sheet.
+  codes that were **not** found.
 
 Matching options: ignore leading/trailing spaces (on by default) and ignore
 upper/lowercase (off by default).
@@ -52,8 +59,7 @@ upper/lowercase (off by default).
 
 ## Notes
 
-- The comparison is against the code's **last 10 characters**, so your Excel
-  column should hold those same 10-character codes for an exact match. If your
-  spreadsheet stores longer strings, turn the "keep last N characters" setting
-  to match, or pre-trim the column.
+- The comparison uses the code's **last 10 characters**. With the default
+  *Cell contains the code* match, it will still find that code inside a longer
+  string in your sheet, so you don't need to pre-trim the column.
 - `.xls` (old format) is not supported — save as `.xlsx` first.
