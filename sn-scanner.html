@@ -79,7 +79,7 @@
     <h2><span class="step">1</span> Scan codes</h2>
     <form id="scanForm" autocomplete="off">
       <div class="scanwrap">
-        <input id="scanBox" type="text" placeholder="Click here, then scan a code…" aria-label="Scan box" autofocus>
+        <input id="scanBox" type="text" placeholder="Click here, then scan — codes are added automatically…" aria-label="Scan box" autofocus>
         <button class="primary" type="submit">Add</button>
       </div>
     </form>
@@ -320,11 +320,26 @@ https://github.com/nodeca/pako/blob/main/LICENSE
     showToast("Added: " + code);
   }
 
-  scanForm.addEventListener("submit", function(e){
-    e.preventDefault();
+  // Commit the current scan box contents. Called both when the scanner sends
+  // an Enter, and automatically a moment after the scanner finishes typing
+  // (many scanners don't send an Enter), so you never press "Add" yourself.
+  var autoTimer = null;
+  function commitScan(){
+    clearTimeout(autoTimer); autoTimer = null;
+    if(!scanBox.value.trim()) return;
     addScan(scanBox.value);
     scanBox.value = "";
     scanBox.focus();
+  }
+  scanForm.addEventListener("submit", function(e){
+    e.preventDefault();
+    commitScan();
+  });
+  // Scanners type the whole code in a fast burst; add it automatically once
+  // typing pauses. A real Enter fires submit first and cancels this timer.
+  scanBox.addEventListener("input", function(){
+    clearTimeout(autoTimer);
+    autoTimer = setTimeout(commitScan, 140);
   });
 
   // keep the scan box focused so a scanner always lands there
