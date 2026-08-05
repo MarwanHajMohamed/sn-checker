@@ -42,6 +42,10 @@ contacts any website — you can use it with the network unplugged.
 - Every matching row gets highlighted (whole row, colour of your choice —
   yellow by default). Untick "Highlight the whole row" to colour only the
   matching cell instead.
+- If your sheet is an Excel **Table** (Format as Table) with built-in
+  banded-row colours, "Remove the table's banded colours" (on by default)
+  strips that styling in the downloaded copy so the **only** coloured cells are
+  your highlights. The table itself is kept intact.
 - You download a **new** highlighted copy — your original file is never changed.
 - A short report tells you how many rows were highlighted and lists any scanned
   codes that were **not** found.

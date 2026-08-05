@@ -155,6 +155,7 @@
       </div>
       <div class="row" style="margin-top:10px">
         <label class="chk"><input id="wholeRow" type="checkbox" checked> Highlight the whole row (not just the cell)</label>
+        <label class="chk"><input id="stripBanding" type="checkbox" checked> Remove the table's banded colours (show only highlights)</label>
         <label class="chk"><input id="trimSpaces" type="checkbox" checked> Ignore leading/trailing spaces</label>
         <label class="chk"><input id="ignoreCase" type="checkbox"> Ignore upper/lowercase</label>
       </div>
@@ -575,6 +576,25 @@ https://github.com/nodeca/pako/blob/main/LICENSE
       }
     }
 
+    // Excel "Format as Table" objects paint their own banded row colours over
+    // the whole table, which can look like everything is highlighted and can
+    // render over our fill in a styled column. Optionally strip that styling so
+    // the ONLY coloured cells are the matches.
+    var bandingRemoved = false;
+    if($("stripBanding").checked && ws.tables){
+      Object.keys(ws.tables).forEach(function(nm){
+        var t = ws.getTable(nm);
+        if(t && t.table && t.table.style){
+          t.table.style.theme = null;
+          t.table.style.showRowStripes = false;
+          t.table.style.showColumnStripes = false;
+          t.table.style.showFirstColumn = false;
+          t.table.style.showLastColumn = false;
+          bandingRemoved = true;
+        }
+      });
+    }
+
     var matchedCodes = Object.keys(foundSet).length;
     var notFound = codes.filter(function(c){ return !foundSet[normalize(c)]; });
 
@@ -585,7 +605,9 @@ https://github.com/nodeca/pako/blob/main/LICENSE
 
       var html = '<div class="ok"><b>'+highlighted+'</b> row(s) highlighted in “'+esc(ws.name)+'”, '+
                  'matching <b>'+matchedCodes+'</b> of your '+codes.length+' code(s). '+
-                 'Downloaded as <code class="k">'+esc(outName)+'</code>.</div>';
+                 'Downloaded as <code class="k">'+esc(outName)+'</code>.' +
+                 (bandingRemoved ? ' The table’s banded colours were removed so only the highlights show.' : '') +
+                 '</div>';
       if(notFound.length){
         html += '<div class="note"><b>'+notFound.length+'</b> scanned code(s) were not found:'+
                 '<ul>'+ notFound.slice(0,50).map(function(c){ return "<li>"+esc(c)+"</li>"; }).join("") +
