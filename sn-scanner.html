@@ -89,22 +89,16 @@
     <p class="autohint">✓ Auto-add is on — just scan, no need to press <b>Add</b>. <span class="ver">v2</span></p>
     <div class="row" style="margin-top:12px">
       <div class="field">
-        <label for="extractMode">Save</label>
-        <select id="extractMode">
-          <option value="last" selected>Last N characters</option>
-          <option value="from">From character # onwards</option>
-        </select>
+        <label for="startAt">From character #</label>
+        <input id="startAt" type="number" min="1" max="1000" value="1" style="width:130px">
       </div>
-      <div class="field" id="lastNField">
-        <label for="trailN">How many (N)</label>
-        <input id="trailN" type="number" min="1" max="500" value="10" style="width:110px">
-      </div>
-      <div class="field hidden" id="startAtField">
-        <label for="startAt">Start at character #</label>
-        <input id="startAt" type="number" min="1" max="500" value="12" style="width:140px">
+      <div class="field">
+        <label for="keepLen">Number of characters</label>
+        <input id="keepLen" type="number" min="0" max="1000" value="10" placeholder="blank = to end" style="width:160px">
       </div>
       <label class="chk"><input id="skipDup" type="checkbox" checked> Skip duplicate codes</label>
     </div>
+    <p class="autohint" style="color:var(--muted)">e.g. <b>From character 12</b> + <b>5 characters</b> saves characters 12–16. Leave the count blank to save to the end.</p>
     <div class="stats">
       <span>Scanned: <b id="countAll">0</b></span>
       <span>Unique codes: <b id="countUnique">0</b></span>
@@ -243,9 +237,7 @@ https://github.com/nodeca/pako/blob/main/LICENSE
   // ---- elements ----
   var $ = function(id){ return document.getElementById(id); };
   var scanForm=$("scanForm"), scanBox=$("scanBox"), scanBody=$("scanBody");
-  var trailN=$("trailN"), skipDup=$("skipDup");
-  var extractMode=$("extractMode"), startAt=$("startAt");
-  var lastNField=$("lastNField"), startAtField=$("startAtField");
+  var startAt=$("startAt"), keepLen=$("keepLen"), skipDup=$("skipDup");
   var countAll=$("countAll"), countUnique=$("countUnique");
   var toast=$("toast");
 
@@ -254,27 +246,25 @@ https://github.com/nodeca/pako/blob/main/LICENSE
     toast.textContent = msg; toast.classList.add("show");
     clearTimeout(toast._t); toast._t = setTimeout(function(){ toast.classList.remove("show"); }, 1600);
   }
-  function trailCount(){
-    var n = parseInt(trailN.value, 10);
-    if(!n || n < 1) n = 10;
-    return n;
-  }
   function startCharPos(){
     var s = parseInt(startAt.value, 10);
     if(!s || s < 1) s = 1;
     return s;
   }
-  // Turn a raw scan into the code we store, per the current "Save" rule:
-  //  - "last"  -> the last N characters
-  //  - "from"  -> everything from character #S onwards (1-based)
+  function keepLenVal(){          // 0 (or blank) means "to the end"
+    var n = parseInt(keepLen.value, 10);
+    if(isNaN(n) || n < 0) n = 0;
+    return n;
+  }
+  // Turn a raw scan into the code we store: take the characters starting at
+  // "From character #" (1-based), for "Number of characters" length. A blank/0
+  // length keeps everything to the end.
   function extractCode(str){
     str = String(str).trim();
-    if(extractMode.value === "from"){
-      var s = startCharPos();
-      return str.length < s ? "" : str.slice(s - 1);
-    }
-    var n = trailCount();
-    return str.length <= n ? str : str.slice(str.length - n);
+    var s = startCharPos();
+    if(str.length < s) return "";           // nothing at that start position
+    var n = keepLenVal();
+    return n > 0 ? str.slice(s - 1, s - 1 + n) : str.slice(s - 1);
   }
   function uniqueCodes(){
     var seen = Object.create(null), out = [];
@@ -300,34 +290,26 @@ https://github.com/nodeca/pako/blob/main/LICENSE
   }
   function saveSettings(){
     try{ localStorage.setItem(SETTINGS_KEY, JSON.stringify({
-      n:trailCount(), start:startCharPos(), mode:extractMode.value, skipDup:skipDup.checked
+      start:startCharPos(), len:keepLenVal(), skipDup:skipDup.checked
     })); }catch(e){}
   }
   function loadSettings(){
     try{
       var s = JSON.parse(localStorage.getItem(SETTINGS_KEY)||"{}");
-      if(s.n){ trailN.value = s.n; }
       if(s.start){ startAt.value = s.start; }
-      if(s.mode === "from" || s.mode === "last"){ extractMode.value = s.mode; }
+      if(typeof s.len === "number"){ keepLen.value = s.len > 0 ? s.len : ""; }
       if(typeof s.skipDup === "boolean"){ skipDup.checked = s.skipDup; }
     }catch(e){}
-    applyExtractMode();
-  }
-  // show the input that belongs to the chosen rule
-  function applyExtractMode(){
-    var from = extractMode.value === "from";
-    startAtField.classList.toggle("hidden", !from);
-    lastNField.classList.toggle("hidden", from);
   }
 
   // ---- rendering ----
   function ruleText(shortForm){
-    if(extractMode.value === "from"){
-      var s = startCharPos();
-      return shortForm ? ("from char " + s) : ("from character " + s + " onwards");
+    var s = startCharPos(), n = keepLenVal();
+    if(n > 0){
+      return shortForm ? ("chars " + s + "–" + (s + n - 1))
+                       : (n + " characters from character " + s);
     }
-    var n = trailCount();
-    return shortForm ? ("last " + n) : ("last " + n + " characters");
+    return shortForm ? ("from char " + s) : ("from character " + s + " onwards");
   }
   function updateNLabels(){
     $("nLabel").textContent = ruleText(false);
@@ -423,9 +405,8 @@ https://github.com/nodeca/pako/blob/main/LICENSE
     save(); render();
   });
 
-  trailN.addEventListener("change", function(){ updateNLabels(); saveSettings(); });
   startAt.addEventListener("change", function(){ updateNLabels(); saveSettings(); });
-  extractMode.addEventListener("change", function(){ applyExtractMode(); updateNLabels(); saveSettings(); });
+  keepLen.addEventListener("input", function(){ updateNLabels(); saveSettings(); });
   skipDup.addEventListener("change", saveSettings);
 
   // ---- table actions ----
