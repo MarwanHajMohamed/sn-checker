@@ -74,7 +74,7 @@
 <body>
 <div class="wrap">
   <h1>SN Checker</h1>
-  <p class="sub">Scan QR / barcodes, keep the last <span id="nLabel">10</span> characters of each,
+  <p class="sub">Scan QR / barcodes, keep the part you choose (<span id="nLabel">last 10 characters</span>) of each,
      build a table, then highlight matching rows in your Excel sheet — all offline in your browser.</p>
 
   <!-- STEP 1: SCAN -->
@@ -89,8 +89,19 @@
     <p class="autohint">✓ Auto-add is on — just scan, no need to press <b>Add</b>. <span class="ver">v2</span></p>
     <div class="row" style="margin-top:12px">
       <div class="field">
-        <label for="trailN">Keep last … characters</label>
-        <input id="trailN" type="number" min="1" max="200" value="10" style="width:110px">
+        <label for="extractMode">Save</label>
+        <select id="extractMode">
+          <option value="last" selected>Last N characters</option>
+          <option value="from">From character # onwards</option>
+        </select>
+      </div>
+      <div class="field" id="lastNField">
+        <label for="trailN">How many (N)</label>
+        <input id="trailN" type="number" min="1" max="500" value="10" style="width:110px">
+      </div>
+      <div class="field hidden" id="startAtField">
+        <label for="startAt">Start at character #</label>
+        <input id="startAt" type="number" min="1" max="500" value="12" style="width:140px">
       </div>
       <label class="chk"><input id="skipDup" type="checkbox" checked> Skip duplicate codes</label>
     </div>
@@ -100,7 +111,7 @@
     </div>
     <div class="tablewrap">
       <table>
-        <thead><tr><th style="width:36px">#</th><th>Time</th><th>Raw scan</th><th>Code (last <span class="nSpan">10</span>)</th><th></th></tr></thead>
+        <thead><tr><th style="width:36px">#</th><th>Time</th><th>Raw scan</th><th>Code (<span class="nSpan">last 10</span>)</th><th></th></tr></thead>
         <tbody id="scanBody"><tr><td colspan="5" class="empty">No scans yet. Click the box above and scan a code.</td></tr></tbody>
       </table>
     </div>
@@ -233,6 +244,8 @@ https://github.com/nodeca/pako/blob/main/LICENSE
   var $ = function(id){ return document.getElementById(id); };
   var scanForm=$("scanForm"), scanBox=$("scanBox"), scanBody=$("scanBody");
   var trailN=$("trailN"), skipDup=$("skipDup");
+  var extractMode=$("extractMode"), startAt=$("startAt");
+  var lastNField=$("lastNField"), startAtField=$("startAtField");
   var countAll=$("countAll"), countUnique=$("countUnique");
   var toast=$("toast");
 
@@ -246,8 +259,21 @@ https://github.com/nodeca/pako/blob/main/LICENSE
     if(!n || n < 1) n = 10;
     return n;
   }
-  function lastChars(str, n){
+  function startCharPos(){
+    var s = parseInt(startAt.value, 10);
+    if(!s || s < 1) s = 1;
+    return s;
+  }
+  // Turn a raw scan into the code we store, per the current "Save" rule:
+  //  - "last"  -> the last N characters
+  //  - "from"  -> everything from character #S onwards (1-based)
+  function extractCode(str){
     str = String(str).trim();
+    if(extractMode.value === "from"){
+      var s = startCharPos();
+      return str.length < s ? "" : str.slice(s - 1);
+    }
+    var n = trailCount();
     return str.length <= n ? str : str.slice(str.length - n);
   }
   function uniqueCodes(){
@@ -273,22 +299,40 @@ https://github.com/nodeca/pako/blob/main/LICENSE
     }catch(e){ scans = []; }
   }
   function saveSettings(){
-    try{ localStorage.setItem(SETTINGS_KEY, JSON.stringify({ n:trailCount(), skipDup:skipDup.checked })); }catch(e){}
+    try{ localStorage.setItem(SETTINGS_KEY, JSON.stringify({
+      n:trailCount(), start:startCharPos(), mode:extractMode.value, skipDup:skipDup.checked
+    })); }catch(e){}
   }
   function loadSettings(){
     try{
       var s = JSON.parse(localStorage.getItem(SETTINGS_KEY)||"{}");
       if(s.n){ trailN.value = s.n; }
+      if(s.start){ startAt.value = s.start; }
+      if(s.mode === "from" || s.mode === "last"){ extractMode.value = s.mode; }
       if(typeof s.skipDup === "boolean"){ skipDup.checked = s.skipDup; }
     }catch(e){}
+    applyExtractMode();
+  }
+  // show the input that belongs to the chosen rule
+  function applyExtractMode(){
+    var from = extractMode.value === "from";
+    startAtField.classList.toggle("hidden", !from);
+    lastNField.classList.toggle("hidden", from);
   }
 
   // ---- rendering ----
-  function updateNLabels(){
+  function ruleText(shortForm){
+    if(extractMode.value === "from"){
+      var s = startCharPos();
+      return shortForm ? ("from char " + s) : ("from character " + s + " onwards");
+    }
     var n = trailCount();
-    $("nLabel").textContent = n;
+    return shortForm ? ("last " + n) : ("last " + n + " characters");
+  }
+  function updateNLabels(){
+    $("nLabel").textContent = ruleText(false);
     var spans = document.querySelectorAll(".nSpan");
-    for(var i=0;i<spans.length;i++) spans[i].textContent = n;
+    for(var i=0;i<spans.length;i++) spans[i].textContent = ruleText(true);
   }
   function render(){
     var codeCounts = Object.create(null);
@@ -321,7 +365,8 @@ https://github.com/nodeca/pako/blob/main/LICENSE
   function addScan(rawValue){
     var raw = String(rawValue).trim();
     if(!raw) return;
-    var code = lastChars(raw, trailCount());
+    var code = extractCode(raw);
+    if(!code){ showToast("Scan shorter than the start position — skipped"); return; }
     if(skipDup.checked){
       for(var i=0;i<scans.length;i++){
         if(scans[i].code === code){ showToast("Duplicate skipped: " + code); return; }
@@ -379,6 +424,8 @@ https://github.com/nodeca/pako/blob/main/LICENSE
   });
 
   trailN.addEventListener("change", function(){ updateNLabels(); saveSettings(); });
+  startAt.addEventListener("change", function(){ updateNLabels(); saveSettings(); });
+  extractMode.addEventListener("change", function(){ applyExtractMode(); updateNLabels(); saveSettings(); });
   skipDup.addEventListener("change", saveSettings);
 
   // ---- table actions ----

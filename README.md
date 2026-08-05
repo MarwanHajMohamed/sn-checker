@@ -20,11 +20,15 @@ contacts any website — you can use it with the network unplugged.
 
 - Click the big scan box, then scan a pack with a USB / Bluetooth barcode
   scanner (they type the code and press Enter, just like a keyboard).
-- The tool takes each scanned string, throws away everything except the **last
-  10 characters**, and adds that code to a table. It then waits for the next
-  scan and adds it to the same table.
+- The tool takes each scanned string, keeps the part you choose, and adds that
+  code to a table. It then waits for the next scan and adds it to the same
+  table.
+- **Save** lets you pick how much of each scan to keep:
+  - **Last N characters** (default, N = 10) — keeps the trailing N characters.
+  - **From character # onwards** — keeps everything from the character number
+    you set to the end (e.g. start at **12** to drop the first 11 characters).
+    A scan shorter than that position is skipped.
 - Duplicate codes are skipped by default (you can turn this off).
-- The number of trailing characters to keep is adjustable (default **10**).
 - Your table is saved in the browser, so a refresh won't lose it.
 - You can **Copy codes**, **Copy the table** (ready to paste into Excel),
   **Export a CSV**, or **Clear all**.
