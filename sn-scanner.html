@@ -28,7 +28,7 @@
           background:var(--brand);color:var(--brand-ink);font:600 14px/1 inherit;
           padding:11px 16px;border-radius:10px;box-shadow:var(--shadow)}
   .howbtn:hover{background:var(--brand-2)}
-  .howbtn .dot{width:8px;height:8px;border-radius:50%;background:#ffb3b3}
+  .howbtn .infoi{display:block}
 
   .wrap{max-width:940px;margin:0 auto;padding:26px 18px 60px}
 
@@ -86,7 +86,18 @@
 
   .panel{background:var(--surface);border:1px solid var(--line);border-radius:var(--radius);
          box-shadow:var(--shadow);padding:16px 16px;margin:18px 0 0}
+  .panel-head{width:100%;display:flex;align-items:center;justify-content:space-between;
+              background:none;border:none;cursor:pointer;font:700 15px/1 inherit;color:var(--ink);padding:2px}
+  .panel-head .chev{color:var(--muted);transition:transform .15s;font-size:14px}
+  .panel.collapsed .chev{transform:rotate(-90deg)}
+  .panel.collapsed .collapsible{display:none}
+  .collapsible{margin-top:12px}
   .tablewrap{overflow-x:auto}
+  /* fixed-height, scrollable scans table with sticky header */
+  .scan-scroll{max-height:300px;overflow:auto;border:1px solid var(--line);border-radius:8px}
+  .scan-scroll table.scans thead th{position:sticky;top:0;background:var(--surface);z-index:1;
+              box-shadow:inset 0 -1px 0 var(--line)}
+  .scan-scroll table.scans th,.scan-scroll table.scans td{border-bottom:none;padding:8px 12px}
   table.scans{width:100%;border-collapse:collapse;font-size:14px}
   table.scans th,table.scans td{text-align:left;padding:8px 10px;border-bottom:1px solid var(--line);vertical-align:top}
   table.scans th{font-size:12px;text-transform:uppercase;letter-spacing:.04em;color:var(--muted)}
@@ -141,7 +152,14 @@
       </svg>
     </div>
     <h1 class="appname">FMD Checker</h1>
-    <button id="howBtn" class="howbtn" type="button"><span class="dot"></span> How it works</button>
+    <button id="howBtn" class="howbtn" type="button">
+      <svg class="infoi" viewBox="0 0 20 20" width="16" height="16" aria-hidden="true">
+        <circle cx="10" cy="10" r="9" fill="none" stroke="currentColor" stroke-width="2"/>
+        <circle cx="10" cy="6" r="1.25" fill="currentColor"/>
+        <rect x="9" y="9" width="2" height="6" rx="1" fill="currentColor"/>
+      </svg>
+      How it works
+    </button>
   </header>
 
   <div id="howPanel" class="howto hidden">
@@ -166,9 +184,8 @@
 
     <!-- SCAN -->
     <form id="scanForm" class="scanwrap" autocomplete="off">
-      <input id="scanBox" type="text" placeholder="Click here, then scan — codes are added automatically…" aria-label="Scan box" autofocus>
+      <input id="scanBox" type="text" placeholder="Click here, then scan…" aria-label="Scan box" autofocus>
     </form>
-    <p class="autohint">✓ Auto-add is on — just scan, no need to press a button. <span class="ver">v5</span></p>
 
     <div class="settings">
       <div class="field">
@@ -185,21 +202,26 @@
 
     <div class="stats">
       <span>Scanned: <b id="countAll">0</b></span>
-      <span>Unique codes: <b id="countUnique">0</b></span>
     </div>
 
-    <div class="panel">
-      <div class="tablewrap">
-        <table class="scans">
-          <thead><tr><th style="width:36px">#</th><th>Time</th><th>Raw scan</th><th>Code (<span class="nSpan">last 10</span>)</th><th></th></tr></thead>
-          <tbody id="scanBody"><tr><td colspan="5" class="empty">No scans yet. Click the box above and scan a code.</td></tr></tbody>
-        </table>
-      </div>
-      <div class="actions">
-        <button id="copyCodes" type="button" class="btn">Copy codes</button>
-        <button id="copyTable" type="button" class="btn">Copy table (for Excel paste)</button>
-        <button id="exportCsv" type="button" class="btn">Export CSV</button>
-        <button id="clearAll" type="button" class="btn btn-danger">Clear all</button>
+    <div class="panel" id="scansPanel">
+      <button id="scansToggle" class="panel-head" type="button" aria-expanded="true" aria-controls="scansCollapse">
+        <span>Scanned codes</span>
+        <span class="chev" aria-hidden="true">▾</span>
+      </button>
+      <div id="scansCollapse" class="collapsible">
+        <div class="tablewrap scan-scroll">
+          <table class="scans">
+            <thead><tr><th style="width:36px">#</th><th>Time</th><th>Raw scan</th><th>Code (<span class="nSpan">last 10</span>)</th><th></th></tr></thead>
+            <tbody id="scanBody"><tr><td colspan="5" class="empty">No scans yet. Click the box above and scan a code.</td></tr></tbody>
+          </table>
+        </div>
+        <div class="actions">
+          <button id="copyCodes" type="button" class="btn">Copy codes</button>
+          <button id="copyTable" type="button" class="btn">Copy table (for Excel paste)</button>
+          <button id="exportCsv" type="button" class="btn">Export CSV</button>
+          <button id="clearAll" type="button" class="btn btn-danger">Clear all</button>
+        </div>
       </div>
     </div>
 
@@ -259,7 +281,7 @@
       <div id="preview" class="preview"></div>
     </div>
 
-    <p class="foot">FMD Checker · runs entirely in your browser · nothing is uploaded.</p>
+    <p class="foot">FMD Checker · runs entirely in your browser · nothing is uploaded · <span class="ver">v5</span></p>
   </main>
   <div id="toast" class="toast"></div>
 
@@ -494,7 +516,7 @@ https://github.com/nodeca/pako/blob/main/LICENSE
       scanBody.innerHTML = rows.join("");
     }
     countAll.textContent = scans.length;
-    countUnique.textContent = uniqueCodes().length;
+    if(countUnique) countUnique.textContent = uniqueCodes().length;
   }
 
   // ---- scan handling ----
@@ -990,6 +1012,15 @@ https://github.com/nodeca/pako/blob/main/LICENSE
   var howBtn=$("howBtn"), howPanel=$("howPanel"), howClose=$("howClose");
   if(howBtn && howPanel) howBtn.addEventListener("click", function(){ howPanel.classList.toggle("hidden"); });
   if(howClose && howPanel) howClose.addEventListener("click", function(){ howPanel.classList.add("hidden"); });
+
+  // ---- collapsible scans panel ----
+  var scansToggle=$("scansToggle"), scansPanel=$("scansPanel");
+  if(scansToggle && scansPanel){
+    scansToggle.addEventListener("click", function(){
+      var collapsed = scansPanel.classList.toggle("collapsed");
+      scansToggle.setAttribute("aria-expanded", collapsed ? "false" : "true");
+    });
+  }
 
   // ---- init ----
   loadSettings();
