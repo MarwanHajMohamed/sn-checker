@@ -60,8 +60,10 @@ Matching options (shared):
 
 Excel-only options: pick the **worksheet**, the **header row**, and which
 **column** to look in (or *Any column – whole row*); **highlight the whole row**
-or only the matching cell; and **remove the table's banded colours** so an Excel
-*Table* export doesn't look fully coloured (the table itself is kept intact).
+or only the matching cell; **format the exported sheet as an Excel table**
+(on by default — adds the filter/sort header so the downloaded file is a proper
+Excel *Table*); and **no banded row colours** to keep the table plain so only
+the highlights stand out (untick for the classic striped look).
 
 **PDF notes:** works on **digital** PDFs whose text is selectable (not scanned
 images). Each row is highlighted wherever a scanned code appears in its line of

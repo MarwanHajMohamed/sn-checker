@@ -175,8 +175,9 @@
           </div>
         </div>
         <div class="row" style="margin-top:10px">
+          <label class="chk"><input id="formatTable" type="checkbox" checked> Format the exported sheet as an Excel table (filters + header)</label>
           <label class="chk"><input id="wholeRow" type="checkbox" checked> Highlight the whole row (not just the cell)</label>
-          <label class="chk"><input id="stripBanding" type="checkbox" checked> Remove the table's banded colours</label>
+          <label class="chk"><input id="stripBanding" type="checkbox" checked> No banded row colours</label>
           <label class="chk"><input id="trimSpaces" type="checkbox" checked> Ignore leading/trailing spaces</label>
         </div>
       </div>
@@ -726,6 +727,39 @@ https://github.com/nodeca/pako/blob/main/LICENSE
     xlsxRowEls.forEach(function(tr, rn){ tr.classList.toggle("hl", res.rows.has(rn)); });
     updateSummary(res.foundNorms.size, res.rows.size);
   }
+  // Wrap the sheet's data range in a real Excel Table (filter/sort header).
+  // addTable rewrites the data cells, so this MUST run before highlights.
+  function buildExportTable(ws){
+    var hr=parseInt(headerRow.value,10)||1;
+    var maxCol=Math.max(ws.columnCount||0, ws.getRow(hr).cellCount||0, 1);
+    var lastRow=ws.rowCount||0;
+    while(lastRow>hr){ var any=false; for(var c=1;c<=maxCol;c++){ if(cellString(ws.getRow(lastRow).getCell(c)).trim()){ any=true; break; } } if(any) break; lastRow--; }
+    if(lastRow<=hr) return false; // no data rows to wrap
+    var seen=Object.create(null), headers=[];
+    for(var hc=1;hc<=maxCol;hc++){
+      var n=cellString(ws.getRow(hr).getCell(hc)).trim() || ("Column"+hc);
+      var base=n, k=2; while(seen[n.toLowerCase()]){ n=base+" "+(k++); } seen[n.toLowerCase()]=1; headers.push(n);
+    }
+    var rows=[];
+    for(var r=hr+1;r<=lastRow;r++){
+      var arr=[];
+      for(var dc=1;dc<=maxCol;dc++){
+        var cell=ws.getRow(r).getCell(dc), v=cell.value;
+        if(v && typeof v==="object" && v.richText) v=cellString(cell);
+        arr.push(v==null?null:v);
+      }
+      rows.push(arr);
+    }
+    var stripes = !$("stripBanding").checked; // "No banded row colours" toggles stripes off
+    try{
+      ws.addTable({ name:"SNCheckerTable", displayName:"SNCheckerTable", ref:colLetter(1)+hr,
+        headerRow:true, totalsRow:false,
+        style:{ theme:"TableStyleMedium2", showRowStripes:stripes, showColumnStripes:false, showFirstColumn:false, showLastColumn:false },
+        columns: headers.map(function(h){ return { name:h, filterButton:true }; }),
+        rows: rows });
+      return true;
+    }catch(e){ return false; }
+  }
   function downloadXlsx(){
     var ws=currentSheet(); if(!ws){ showToast("No sheet loaded"); return; }
     var res=xlsxCompute();
@@ -737,14 +771,14 @@ https://github.com/nodeca/pako/blob/main/LICENSE
     // mutates that shared object and colours the whole table. Cloning the cell's
     // style first keeps the fill on just this cell.
     function setFill(cell){ cell.style = Object.assign({}, cell.style, { fill: fill }); }
-    res.rows.forEach(function(r){
-      var row=ws.getRow(r);
-      if(wholeRow){ for(var c=1;c<=res.lastCol;c++){ setFill(row.getCell(c)); } }
-      else { (res.cellsByRow.get(r)||[]).forEach(function(c){ setFill(row.getCell(c)); }); }
-      row.commit && row.commit();
-    });
-    if($("stripBanding").checked && ws.tables){
-      Object.keys(ws.tables).forEach(function(nm){
+
+    // 1) remember source tables, then optionally wrap the data in a NEW table
+    var preNames = ws.tables ? Object.keys(ws.tables) : [];
+    if($("formatTable").checked && preNames.length===0){ buildExportTable(ws); }
+
+    // 2) strip banding on any tables that were ALREADY in the source file
+    if($("stripBanding").checked && preNames.length){
+      preNames.forEach(function(nm){
         var t=ws.getTable(nm);
         if(t && t.table && t.table.style){
           t.table.style.theme=null; t.table.style.showRowStripes=false; t.table.style.showColumnStripes=false;
@@ -752,6 +786,15 @@ https://github.com/nodeca/pako/blob/main/LICENSE
         }
       });
     }
+
+    // 3) apply highlights AFTER any table creation (addTable rewrites cells)
+    res.rows.forEach(function(r){
+      var row=ws.getRow(r);
+      if(wholeRow){ for(var c=1;c<=res.lastCol;c++){ setFill(row.getCell(c)); } }
+      else { (res.cellsByRow.get(r)||[]).forEach(function(c){ setFill(row.getCell(c)); }); }
+      row.commit && row.commit();
+    });
+
     workbook.xlsx.writeBuffer().then(function(buf){
       var outName=loadedFileName.replace(/\.xlsx$/i,"")+"-highlighted.xlsx";
       downloadBlob(new Blob([buf],{type:"application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"}), outName);
