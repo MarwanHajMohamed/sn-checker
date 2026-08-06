@@ -168,12 +168,12 @@
       <button id="howClose" class="close" type="button" aria-label="Close">&times;</button>
       <h3 id="howTitle">How it works</h3>
       <ol>
-        <li><b>Upload your table</b> — an Excel <span class="k">.xlsx</span> or a digital <span class="k">.pdf</span>. It appears as a live preview below.</li>
-        <li><b>Set which part of each code to keep</b> — <b>From character number</b> + <b>Number of characters</b> (e.g. from 12, keep 5 → characters 12–16). Leave the count blank to keep to the end.</li>
+        <li><b>Upload your table</b> - an Excel <span class="k">.xlsx</span> or a digital <span class="k">.pdf</span>.</li>
+        <li><b>Set which part of each code to keep</b> - <b>From character number</b> + <b>Number of characters</b> (e.g. from 12, keep 5 → characters 12–16).</li>
         <li><b>Scan.</b> Each matching row lights up <b>live</b> in the preview. Duplicates are skipped by default.</li>
-        <li><b>Download</b> the highlighted copy — a new Excel table (with filters) or a highlighted PDF. Your original file is never changed.</li>
+        <li><b>Download</b> the highlighted copy.</li>
       </ol>
-      <p class="modal-foot">Everything runs locally in your browser — no data leaves this page.</p>
+      <p class="modal-foot">Everything runs locally in your browser - no data leaves this page.</p>
     </div>
   </div>
 
@@ -527,7 +527,7 @@ https://github.com/nodeca/pako/blob/main/LICENSE
     var raw = String(rawValue).trim();
     if(!raw) return;
     var code = extractCode(raw);
-    if(!code){ showToast("Scan shorter than the start position — skipped"); return; }
+    if(!code){ showToast("Scan shorter than the start position - skipped"); return; }
     if(skipDup.checked){
       for(var i=0;i<scans.length;i++){
         if(scans[i].code === code){ showToast("Duplicate skipped: " + code); return; }
@@ -610,7 +610,7 @@ https://github.com/nodeca/pako/blob/main/LICENSE
     if(!scans.length){ showToast("Nothing to copy"); return; }
     var lines = ["Time\tRaw scan\tCode"];
     scans.forEach(function(s){ lines.push(fmtTime(s.time)+"\t"+s.raw+"\t"+s.code); });
-    copyText(lines.join("\n"), "Table copied — paste into Excel");
+    copyText(lines.join("\n"), "Table copied - paste into Excel");
   });
   $("exportCsv").addEventListener("click", function(){
     if(!scans.length){ showToast("Nothing to export"); return; }
@@ -726,7 +726,7 @@ https://github.com/nodeca/pako/blob/main/LICENSE
       docControls.classList.remove("hidden"); xlsxOpts.classList.remove("hidden");
       buildXlsxPreview();
       refreshHighlights();
-      statusMsg("Loaded “"+esc(loadedFileName)+"” — "+workbook.worksheets.length+" sheet(s). Scan to highlight rows live.", "ok");
+      statusMsg("Loaded “"+esc(loadedFileName)+"” - "+workbook.worksheets.length+" sheet(s). Scan to highlight rows live.", "ok");
     }).catch(function(err){
       statusMsg("Could not read that spreadsheet: "+esc(err.message||err)+". Make sure it is a real .xlsx file.", "note");
     });
@@ -745,10 +745,10 @@ https://github.com/nodeca/pako/blob/main/LICENSE
     var hr=parseInt(headerRow.value,10)||1;
     var row=ws.getRow(hr);
     var maxCol=Math.max(ws.columnCount||0, row.cellCount||0, 1);
-    var anyOpt=document.createElement("option"); anyOpt.value="0"; anyOpt.textContent="Any column — whole row"; colSel.appendChild(anyOpt);
+    var anyOpt=document.createElement("option"); anyOpt.value="0"; anyOpt.textContent="Any column - whole row"; colSel.appendChild(anyOpt);
     for(var c=1;c<=maxCol;c++){
       var name=cellString(row.getCell(c)).trim();
-      var opt=document.createElement("option"); opt.value=c; opt.textContent=colLetter(c)+(name?" — "+name:""); colSel.appendChild(opt);
+      var opt=document.createElement("option"); opt.value=c; opt.textContent=colLetter(c)+(name?" - "+name:""); colSel.appendChild(opt);
     }
     colSel.value="0";
   }
@@ -884,7 +884,7 @@ https://github.com/nodeca/pako/blob/main/LICENSE
     workbook.xlsx.writeBuffer().then(function(buf){
       var outName=loadedFileName.replace(/\.xlsx$/i,"")+"-highlighted.xlsx";
       downloadBlob(new Blob([buf],{type:"application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"}), outName);
-      showToast(res.rows.size+" row(s) highlighted — downloaded");
+      showToast(res.rows.size+" row(s) highlighted - downloaded");
     }).catch(function(err){ statusMsg("Could not write the file: "+esc(err.message||err), "note"); });
   }
   sheetSel.addEventListener("change", function(){ populateColumns(); buildXlsxPreview(); refreshHighlights(); });
@@ -906,7 +906,7 @@ https://github.com/nodeca/pako/blob/main/LICENSE
       docControls.classList.remove("hidden"); pdfOpts.classList.remove("hidden");
       renderPdf(pdf).then(function(){
         refreshHighlights();
-        statusMsg("Loaded “"+esc(loadedFileName)+"” — "+pdf.numPages+" page(s). Scan to highlight rows live.", "ok");
+        statusMsg("Loaded “"+esc(loadedFileName)+"” - "+pdf.numPages+" page(s). Scan to highlight rows live.", "ok");
       });
     }).catch(function(err){ statusMsg("Could not read that PDF: "+esc(err.message||err), "note"); });
   }
@@ -992,7 +992,7 @@ https://github.com/nodeca/pako/blob/main/LICENSE
       });
       return pdfDoc.save().then(function(bytes){
         downloadBlob(new Blob([bytes],{type:"application/pdf"}), loadedFileName.replace(/\.pdf$/i,"")+"-highlighted.pdf");
-        showToast(total+" row(s) highlighted — downloaded");
+        showToast(total+" row(s) highlighted - downloaded");
       });
     }).catch(function(err){ statusMsg("Could not write the PDF: "+esc(err.message||err), "note"); });
   }
