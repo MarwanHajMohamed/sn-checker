@@ -732,10 +732,15 @@ https://github.com/nodeca/pako/blob/main/LICENSE
     var argb="FF"+$("hlColor").value.replace("#","").toUpperCase();
     var fill={ type:"pattern", pattern:"solid", fgColor:{ argb:argb } };
     var wholeRow=$("wholeRow").checked;
+    // IMPORTANT: assign a fresh style object per cell. In files exported with
+    // uniform formatting, many cells share ONE style object; doing cell.fill=…
+    // mutates that shared object and colours the whole table. Cloning the cell's
+    // style first keeps the fill on just this cell.
+    function setFill(cell){ cell.style = Object.assign({}, cell.style, { fill: fill }); }
     res.rows.forEach(function(r){
       var row=ws.getRow(r);
-      if(wholeRow){ for(var c=1;c<=res.lastCol;c++){ row.getCell(c).fill=fill; } }
-      else { (res.cellsByRow.get(r)||[]).forEach(function(c){ row.getCell(c).fill=fill; }); }
+      if(wholeRow){ for(var c=1;c<=res.lastCol;c++){ setFill(row.getCell(c)); } }
+      else { (res.cellsByRow.get(r)||[]).forEach(function(c){ setFill(row.getCell(c)); }); }
       row.commit && row.commit();
     });
     if($("stripBanding").checked && ws.tables){
