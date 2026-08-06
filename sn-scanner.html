@@ -21,7 +21,7 @@
   .topbar{position:relative;display:flex;align-items:center;justify-content:space-between;
           padding:18px 26px;border-bottom:1px solid var(--line)}
   .brand{display:flex;align-items:center;z-index:2}
-  .brand svg{height:38px;width:auto;display:block}
+  .brand svg,.brand img.brandlogo{height:38px;width:auto;display:block}
   .appname{position:absolute;left:0;right:0;margin:0 auto;text-align:center;
            font-size:22px;font-weight:700;letter-spacing:.2px;pointer-events:none}
   .howbtn{z-index:2;display:inline-flex;align-items:center;gap:8px;border:none;cursor:pointer;
@@ -32,13 +32,21 @@
 
   .wrap{max-width:940px;margin:0 auto;padding:26px 18px 60px}
 
-  /* how-it-works panel */
-  .howto{max-width:940px;margin:14px auto 0;background:var(--surface);border:1px solid var(--line);
-         border-radius:var(--radius);box-shadow:var(--shadow);padding:18px 20px}
-  .howto h3{margin:0 0 8px;font-size:16px}
-  .howto ol{margin:0;padding-left:20px}
-  .howto li{margin:5px 0}
-  .howto .close{float:right;border:none;background:none;color:var(--muted);cursor:pointer;font-size:20px;line-height:1}
+  /* how-it-works modal */
+  .modal{position:fixed;inset:0;z-index:60;display:flex;align-items:center;justify-content:center;padding:20px}
+  .modal.hidden{display:none}
+  .modal-backdrop{position:absolute;inset:0;background:rgba(28,16,14,.5);backdrop-filter:blur(1px)}
+  .modal-box{position:relative;background:var(--surface);border-radius:16px;
+             box-shadow:0 24px 70px rgba(0,0,0,.32);max-width:520px;width:100%;max-height:85vh;overflow:auto;
+             padding:24px 26px;animation:pop .16s ease-out}
+  @keyframes pop{from{opacity:0;transform:translateY(8px) scale(.98)}to{opacity:1;transform:none}}
+  .modal-box h3{margin:0 0 12px;font-size:19px}
+  .modal-box ol{margin:0;padding-left:20px}
+  .modal-box li{margin:7px 0}
+  .modal-box .close{position:absolute;top:12px;right:14px;border:none;background:none;color:var(--muted);
+             cursor:pointer;font-size:26px;line-height:1}
+  .modal-box .close:hover{color:var(--ink)}
+  .modal-foot{color:var(--muted);font-size:12px;margin-top:16px}
 
   /* buttons */
   .btn{display:inline-flex;align-items:center;justify-content:center;gap:8px;cursor:pointer;
@@ -140,16 +148,8 @@
 </head>
 <body>
   <header class="topbar">
-    <div class="brand" aria-label="Zeymos Pharma">
-      <svg viewBox="0 0 168 48" role="img" aria-label="Zeymos Pharma logo">
-        <text x="0" y="23" font-family="Arial Black, Arial, sans-serif" font-weight="900" font-size="21" letter-spacing="1.5" fill="#161311">ZEYMOS</text>
-        <text x="6" y="39" font-family="Arial, sans-serif" font-weight="700" font-size="12" letter-spacing="4" fill="#4a423e">pharma</text>
-        <g fill="#e2001a">
-          <polygon points="112,3 156,3 145,14 101,14"/>
-          <polygon points="120,16 158,16 148,26 110,26"/>
-          <polygon points="60,42 156,42 151,48 55,48"/>
-        </g>
-      </svg>
+    <div class="brand">
+      <img class="brandlogo" src="data:image/png;base64,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" alt="Zeymos Pharma">
     </div>
     <h1 class="appname">FMD Checker</h1>
     <button id="howBtn" class="howbtn" type="button">
@@ -162,16 +162,19 @@
     </button>
   </header>
 
-  <div id="howPanel" class="howto hidden">
-    <button id="howClose" class="close" type="button" aria-label="Close">&times;</button>
-    <h3>How it works</h3>
-    <ol>
-      <li><b>Upload your table</b> — an Excel <span class="k">.xlsx</span> or a digital <span class="k">.pdf</span>. It appears as a live preview below.</li>
-      <li><b>Set which part of each code to keep</b> — <b>From character number</b> + <b>Number of characters</b> (e.g. from 12, keep 5 → characters 12–16). Leave the count blank to keep to the end.</li>
-      <li><b>Scan.</b> Each matching row lights up <b>live</b> in the preview. Duplicates are skipped by default.</li>
-      <li><b>Download</b> the highlighted copy — a new Excel table (with filters) or a highlighted PDF. Your original file is never changed.</li>
-    </ol>
-    <p class="foot" style="text-align:left;margin-top:12px">Everything runs locally in your browser — no data leaves this page.</p>
+  <div id="howPanel" class="modal hidden" role="dialog" aria-modal="true" aria-labelledby="howTitle">
+    <div class="modal-backdrop" id="howBackdrop"></div>
+    <div class="modal-box" role="document">
+      <button id="howClose" class="close" type="button" aria-label="Close">&times;</button>
+      <h3 id="howTitle">How it works</h3>
+      <ol>
+        <li><b>Upload your table</b> — an Excel <span class="k">.xlsx</span> or a digital <span class="k">.pdf</span>. It appears as a live preview below.</li>
+        <li><b>Set which part of each code to keep</b> — <b>From character number</b> + <b>Number of characters</b> (e.g. from 12, keep 5 → characters 12–16). Leave the count blank to keep to the end.</li>
+        <li><b>Scan.</b> Each matching row lights up <b>live</b> in the preview. Duplicates are skipped by default.</li>
+        <li><b>Download</b> the highlighted copy — a new Excel table (with filters) or a highlighted PDF. Your original file is never changed.</li>
+      </ol>
+      <p class="modal-foot">Everything runs locally in your browser — no data leaves this page.</p>
+    </div>
   </div>
 
   <main class="wrap">
@@ -1008,10 +1011,16 @@ https://github.com/nodeca/pako/blob/main/LICENSE
     if(docType==="pdf") refreshPdfHighlights();
   });
 
-  // ---- How it works panel ----
-  var howBtn=$("howBtn"), howPanel=$("howPanel"), howClose=$("howClose");
-  if(howBtn && howPanel) howBtn.addEventListener("click", function(){ howPanel.classList.toggle("hidden"); });
-  if(howClose && howPanel) howClose.addEventListener("click", function(){ howPanel.classList.add("hidden"); });
+  // ---- How it works modal ----
+  var howBtn=$("howBtn"), howPanel=$("howPanel"), howClose=$("howClose"), howBackdrop=$("howBackdrop");
+  function openHow(){ if(howPanel) howPanel.classList.remove("hidden"); }
+  function closeHow(){ if(howPanel) howPanel.classList.add("hidden"); }
+  if(howBtn) howBtn.addEventListener("click", openHow);
+  if(howClose) howClose.addEventListener("click", closeHow);
+  if(howBackdrop) howBackdrop.addEventListener("click", closeHow);
+  document.addEventListener("keydown", function(e){
+    if(e.key==="Escape" && howPanel && !howPanel.classList.contains("hidden")) closeHow();
+  });
 
   // ---- collapsible scans panel ----
   var scansToggle=$("scansToggle"), scansPanel=$("scansPanel");
