@@ -1,8 +1,8 @@
 # SN Checker
 
-An offline tool for scanning QR / barcodes, keeping the **last 10 characters** of
-each code, building a table of them, and then **highlighting the matching rows in
-your Excel sheet**.
+An offline tool for scanning QR / barcodes, keeping the part of each code you
+choose, building a table of them, and then **highlighting the matching rows** in
+your **Excel sheet or PDF table** — live, as you scan.
 
 Everything runs locally in your browser. Nothing is uploaded and the page never
 contacts any website — you can use it with the network unplugged.
@@ -10,9 +10,11 @@ contacts any website — you can use it with the network unplugged.
 ## The file
 
 - **`sn-scanner.html`** — a single, self-contained page. Double-click it to open
-  in any browser (Chrome, Edge, Firefox). No install, works offline. The Excel
-  reading/writing library ([ExcelJS](https://github.com/exceljs/exceljs)) is
-  bundled inside the file, so there is nothing else to download.
+  in any browser (Chrome, Edge, Firefox). No install, works offline. Everything
+  it needs is bundled inside the file: [ExcelJS](https://github.com/exceljs/exceljs)
+  (read/write `.xlsx`), [pdf.js](https://github.com/mozilla/pdf.js) (read PDF
+  text) and [pdf-lib](https://github.com/Hopding/pdf-lib) (write the highlighted
+  PDF).
 
 ## What it does
 
@@ -34,41 +36,47 @@ contacts any website — you can use it with the network unplugged.
 - You can **Copy codes**, **Copy the table** (ready to paste into Excel),
   **Export a CSV**, or **Clear all**.
 
-**Step 2 — Highlight matches in Excel**
+**Step 2 — Highlight rows live (Excel or PDF)**
 
-- Load your `.xlsx` file and pick the worksheet.
-- Choose how to match:
-  - **Match when** — *Cell contains the code* (default) highlights a row when
-    the code appears **anywhere inside** a cell's value, so it works even when
-    the sheet stores longer strings around the code. *Cell exactly equals the
-    code* requires a whole-cell match.
-  - **Look in** — *Any column (whole row)* (default) searches every column, or
-    pick a single column to restrict the search.
-- Every matching row gets highlighted (whole row, colour of your choice —
-  yellow by default). Untick "Highlight the whole row" to colour only the
-  matching cell instead.
-- If your sheet is an Excel **Table** (Format as Table) with built-in
-  banded-row colours, "Remove the table's banded colours" (on by default)
-  strips that styling in the downloaded copy so the **only** coloured cells are
-  your highlights. The table itself is kept intact.
-- You download a **new** highlighted copy — your original file is never changed.
-- A short report tells you how many rows were highlighted and lists any scanned
-  codes that were **not** found.
+- **Load your table first** — an Excel `.xlsx` **or** a digital PDF (`.pdf`).
+  It appears as a live preview below.
+- **Then scan.** Each matching row lights up **immediately** in the preview as
+  you scan. Load-first-then-scan or scan-first-then-load both work — loading a
+  file highlights everything already scanned.
+- When you're done, click **Download highlighted file** to save a **new** copy
+  with the rows highlighted. Your original file is never changed.
+- A live summary shows how many rows are highlighted and how many of your
+  scanned codes have been matched / not found yet.
 
-Matching options: ignore leading/trailing spaces (on by default) and ignore
-upper/lowercase (off by default).
+Matching options (shared):
+
+- **Match when** — *contains the code* (default) highlights a row when the code
+  appears **anywhere inside** a cell / line, so it works even when the table
+  stores longer strings around the code. *Exactly equals* (Excel only) requires
+  a whole-cell match.
+- **Ignore upper/lowercase** — off by default.
+- Highlight **colour** — yellow by default; the preview and the downloaded file
+  use whatever you pick.
+
+Excel-only options: pick the **worksheet**, the **header row**, and which
+**column** to look in (or *Any column – whole row*); **highlight the whole row**
+or only the matching cell; and **remove the table's banded colours** so an Excel
+*Table* export doesn't look fully coloured (the table itself is kept intact).
+
+**PDF notes:** works on **digital** PDFs whose text is selectable (not scanned
+images). Each row is highlighted wherever a scanned code appears in its line of
+text, and the whole row gets a translucent band so the text stays readable.
+Rotated pages or PDFs with an unusual page origin may highlight slightly off.
 
 ## Typical workflow
 
-1. Open `sn-scanner.html`.
-2. Scan every pack. Watch the table fill up (last 10 characters of each code).
-3. Go to Step 2, load your Excel sheet, choose the column with the serials, and
-   click **Highlight matches & download**.
-4. Open the downloaded `…-highlighted.xlsx` — the matching rows are highlighted.
+1. Open `sn-scanner.html` (the scan box shows a green **v4** marker).
+2. In Step 2, load your Excel sheet or PDF.
+3. Scan every pack — matching rows highlight live.
+4. Click **Download highlighted file** and open the `…-highlighted.xlsx` /
+   `…-highlighted.pdf`.
 
 ## Notes
 
-- The comparison uses the code's **last 10 characters**. With the default
-  *Cell contains the code* match, it will still find that code inside a longer
-  string in your sheet, so you don't need to pre-trim the column.
-- `.xls` (old format) is not supported — save as `.xlsx` first.
+- `.xls` (old Excel format) is not supported — save as `.xlsx` first.
+- Very large PDFs (many pages) take a moment to render the live preview.
