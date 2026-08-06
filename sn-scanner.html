@@ -3,147 +3,210 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
-<title>SN Checker — Scan &amp; Match</title>
+<title>FMD Checker</title>
 <style>
   :root{
-    --bg:#f4f6f9; --card:#ffffff; --ink:#1b2733; --muted:#6b7a8d;
-    --line:#e2e8f0; --brand:#1f6feb; --brand-ink:#fff;
-    --ok:#177245; --ok-bg:#e6f4ea; --warn:#8a5a00; --warn-bg:#fff4e0;
-    --dup:#b23; --code-bg:#0f172a; --code-ink:#e2e8f0;
-    --radius:12px; --shadow:0 1px 3px rgba(16,24,40,.08),0 1px 2px rgba(16,24,40,.06);
+    --bg:#f7f4f2; --surface:#ffffff; --ink:#1c1a19; --muted:#726b67;
+    --line:#e7e0db; --line-2:#d9d0ca;
+    --brand:#8a1116; --brand-2:#a01a20; --brand-ink:#fff; --brand-red:#e2001a;
+    --ok:#177245; --ok-bg:#e8f4ec; --warn:#8a5a00; --warn-bg:#fbf1dd;
+    --radius:12px; --shadow:0 1px 2px rgba(40,20,15,.06),0 4px 16px rgba(40,20,15,.05);
   }
   *{box-sizing:border-box}
-  body{margin:0;font:15px/1.5 system-ui,-apple-system,Segoe UI,Roboto,Helvetica,Arial,sans-serif;
-       background:var(--bg);color:var(--ink);padding:24px 16px}
-  .wrap{max-width:900px;margin:0 auto}
-  h1{font-size:22px;margin:0 0 4px}
-  .sub{color:var(--muted);margin:0 0 20px}
-  .card{background:var(--card);border:1px solid var(--line);border-radius:var(--radius);
-        box-shadow:var(--shadow);padding:18px 18px;margin:0 0 18px}
-  .card h2{font-size:16px;margin:0 0 12px;display:flex;align-items:center;gap:8px}
-  .step{display:inline-flex;align-items:center;justify-content:center;width:22px;height:22px;
-        border-radius:50%;background:var(--brand);color:#fff;font-size:13px;font-weight:600}
-  label{font-size:13px;color:var(--muted)}
-  .row{display:flex;flex-wrap:wrap;gap:14px;align-items:end}
-  .field{display:flex;flex-direction:column;gap:4px}
-  input[type=text],input[type=number],select{
-    font:inherit;padding:9px 10px;border:1px solid var(--line);border-radius:8px;background:#fff;color:inherit}
-  input[type=text]:focus,input[type=number]:focus,select:focus{outline:2px solid var(--brand);outline-offset:0;border-color:var(--brand)}
-  #scanBox{font-size:20px;letter-spacing:.5px;padding:14px 14px;width:100%;transition:background .1s,border-color .1s}
+  html,body{margin:0}
+  body{font:15px/1.55 system-ui,-apple-system,"Segoe UI",Roboto,Helvetica,Arial,sans-serif;
+       background:var(--bg);color:var(--ink);-webkit-font-smoothing:antialiased}
+
+  /* top bar */
+  .topbar{position:relative;display:flex;align-items:center;justify-content:space-between;
+          padding:18px 26px;border-bottom:1px solid var(--line)}
+  .brand{display:flex;align-items:center;z-index:2}
+  .brand svg{height:38px;width:auto;display:block}
+  .appname{position:absolute;left:0;right:0;margin:0 auto;text-align:center;
+           font-size:22px;font-weight:700;letter-spacing:.2px;pointer-events:none}
+  .howbtn{z-index:2;display:inline-flex;align-items:center;gap:8px;border:none;cursor:pointer;
+          background:var(--brand);color:var(--brand-ink);font:600 14px/1 inherit;
+          padding:11px 16px;border-radius:10px;box-shadow:var(--shadow)}
+  .howbtn:hover{background:var(--brand-2)}
+  .howbtn .dot{width:8px;height:8px;border-radius:50%;background:#ffb3b3}
+
+  .wrap{max-width:940px;margin:0 auto;padding:26px 18px 60px}
+
+  /* how-it-works panel */
+  .howto{max-width:940px;margin:14px auto 0;background:var(--surface);border:1px solid var(--line);
+         border-radius:var(--radius);box-shadow:var(--shadow);padding:18px 20px}
+  .howto h3{margin:0 0 8px;font-size:16px}
+  .howto ol{margin:0;padding-left:20px}
+  .howto li{margin:5px 0}
+  .howto .close{float:right;border:none;background:none;color:var(--muted);cursor:pointer;font-size:20px;line-height:1}
+
+  /* buttons */
+  .btn{display:inline-flex;align-items:center;justify-content:center;gap:8px;cursor:pointer;
+       font:600 15px/1 inherit;border-radius:10px;border:1px solid var(--line-2);
+       background:var(--surface);color:var(--ink);padding:11px 16px}
+  .btn:hover{background:#faf7f5}
+  .btn-primary{background:var(--brand);color:var(--brand-ink);border-color:var(--brand)}
+  .btn-primary:hover{background:var(--brand-2)}
+  .btn-danger{color:var(--brand);border-color:#e6c9cb}
+  .btn-danger:hover{background:#fbeff0}
+  .btn.big{padding:14px 30px;font-size:16px;border-radius:12px;box-shadow:var(--shadow)}
+
+  /* upload */
+  .uploadrow{display:flex;justify-content:center;margin:6px 0 4px}
+  .visually-hidden{position:absolute;width:1px;height:1px;padding:0;margin:-1px;overflow:hidden;
+                   clip:rect(0 0 0 0);white-space:nowrap;border:0}
+  .statusline{max-width:660px;margin:8px auto 0;text-align:center}
+  .statusline .note,.statusline .ok{display:inline-block;border-radius:8px;padding:8px 12px;font-size:13px}
+  .note{background:var(--warn-bg);color:var(--warn)}
+  .ok{background:var(--ok-bg);color:var(--ok)}
+
+  /* scan */
+  .scanwrap{max-width:660px;margin:22px auto 0}
+  #scanBox{width:100%;font-size:20px;letter-spacing:.5px;padding:15px 16px;border:1px solid var(--line-2);
+           border-radius:12px;background:var(--surface);color:inherit;box-shadow:var(--shadow);
+           transition:background .1s,border-color .1s,box-shadow .1s}
+  #scanBox:focus{outline:none;border-color:var(--brand);box-shadow:0 0 0 3px rgba(138,17,22,.15)}
   #scanBox.flash{background:var(--ok-bg);border-color:var(--ok)}
-  .autohint{margin:10px 0 0;font-size:13px;color:var(--ok)}
-  .autohint .ver{color:var(--muted);font-weight:600;margin-left:6px}
-  .scanwrap{display:flex;gap:10px}
-  .scanwrap input{flex:1}
-  button{font:inherit;font-weight:600;padding:10px 14px;border:1px solid var(--line);border-radius:8px;
-         background:#fff;color:var(--ink);cursor:pointer}
-  button:hover{background:#f0f4f9}
-  button.primary{background:var(--brand);color:var(--brand-ink);border-color:var(--brand)}
-  button.primary:hover{filter:brightness(1.05)}
-  button.danger{color:#b02a37;border-color:#f1c9cd}
-  button.danger:hover{background:#fdeef0}
-  .stats{display:flex;gap:20px;margin:12px 0 4px;font-size:14px}
+  .autohint{max-width:660px;margin:10px auto 0;font-size:13px;color:var(--ok);text-align:center}
+  .autohint .ver{color:var(--muted);font-weight:700;margin-left:6px}
+
+  .settings{max-width:660px;margin:16px auto 0;display:flex;flex-wrap:wrap;gap:16px;align-items:flex-end;justify-content:center}
+  .field{display:flex;flex-direction:column;gap:5px}
+  label{font-size:13px;color:var(--muted)}
+  input[type=text],input[type=number],select{font:inherit;padding:9px 10px;border:1px solid var(--line-2);
+       border-radius:8px;background:var(--surface);color:inherit}
+  input[type=number]{width:120px}
+  input:focus,select:focus{outline:none;border-color:var(--brand);box-shadow:0 0 0 3px rgba(138,17,22,.12)}
+  .chk{display:inline-flex;align-items:center;gap:7px;font-size:13.5px;color:var(--ink)}
+  .chk input{width:16px;height:16px;accent-color:var(--brand)}
+  .hint{max-width:660px;margin:10px auto 0;text-align:center;font-size:13px;color:var(--muted)}
+
+  .stats{max-width:660px;margin:18px auto 4px;display:flex;gap:22px;justify-content:center;font-size:14px}
   .stats b{font-size:18px}
-  .chk{display:flex;align-items:center;gap:6px;font-size:13px;color:var(--ink)}
-  .chk input{width:16px;height:16px}
-  .actions{display:flex;flex-wrap:wrap;gap:10px;margin-top:12px}
-  table{width:100%;border-collapse:collapse;font-size:14px}
-  th,td{text-align:left;padding:8px 10px;border-bottom:1px solid var(--line);vertical-align:top}
-  th{font-size:12px;text-transform:uppercase;letter-spacing:.04em;color:var(--muted)}
-  td.raw{color:var(--muted);max-width:340px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
-  td.code{font-family:ui-monospace,SFMono-Regular,Menlo,Consolas,monospace;font-weight:600;letter-spacing:.5px}
-  .badge{display:inline-block;font-size:11px;padding:1px 7px;border-radius:20px;font-weight:600}
-  .badge.dup{background:#fdeef0;color:var(--dup)}
-  .del{border:none;background:none;color:var(--muted);cursor:pointer;font-size:16px;padding:2px 6px}
-  .del:hover{color:#b02a37}
+
+  .panel{background:var(--surface);border:1px solid var(--line);border-radius:var(--radius);
+         box-shadow:var(--shadow);padding:16px 16px;margin:18px 0 0}
   .tablewrap{overflow-x:auto}
+  table.scans{width:100%;border-collapse:collapse;font-size:14px}
+  table.scans th,table.scans td{text-align:left;padding:8px 10px;border-bottom:1px solid var(--line);vertical-align:top}
+  table.scans th{font-size:12px;text-transform:uppercase;letter-spacing:.04em;color:var(--muted)}
+  td.raw{color:var(--muted);max-width:320px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+  td.code{font-family:ui-monospace,SFMono-Regular,Menlo,Consolas,monospace;font-weight:600;letter-spacing:.5px}
+  .badge{display:inline-block;font-size:11px;padding:1px 7px;border-radius:20px;font-weight:600;background:#fbeff0;color:var(--brand)}
+  .del{border:none;background:none;color:var(--muted);cursor:pointer;font-size:16px;padding:2px 6px}
+  .del:hover{color:var(--brand)}
   .empty{color:var(--muted);padding:14px 4px}
-  .note{background:var(--warn-bg);color:var(--warn);border-radius:8px;padding:10px 12px;font-size:13px;margin-top:12px}
-  .ok{background:var(--ok-bg);color:var(--ok);border-radius:8px;padding:10px 12px;font-size:14px;margin-top:12px}
+  .actions{display:flex;flex-wrap:wrap;gap:10px;margin-top:14px;justify-content:center}
+
+  .row{display:flex;flex-wrap:wrap;gap:14px;align-items:end}
+  .hl-color{width:44px;height:38px;padding:2px;border:1px solid var(--line-2);border-radius:8px;background:#fff}
   .hidden{display:none}
+  .k{background:#f0eae6;padding:1px 6px;border-radius:5px;font-family:ui-monospace,Menlo,Consolas,monospace}
   .report{margin-top:12px;font-size:14px}
   .report ul{margin:6px 0 0;padding-left:20px;color:var(--muted)}
-  code.k{background:#eef2f7;padding:1px 6px;border-radius:5px;font-family:ui-monospace,Menlo,Consolas,monospace}
-  .toast{position:fixed;left:50%;bottom:24px;transform:translateX(-50%);background:#1b2733;color:#fff;
-         padding:10px 16px;border-radius:8px;font-size:14px;box-shadow:var(--shadow);opacity:0;transition:opacity .2s;pointer-events:none}
-  .toast.show{opacity:1}
-  .hl-color{width:44px;height:38px;padding:2px;border:1px solid var(--line);border-radius:8px;background:#fff}
-  .foot{color:var(--muted);font-size:12px;text-align:center;margin-top:8px}
+  .sectiontitle{font-size:15px;font-weight:700;margin:0 0 12px;display:flex;align-items:center;gap:8px}
+  .sectiontitle .tag{font-size:11px;font-weight:600;color:var(--brand);background:#fbeff0;padding:2px 8px;border-radius:20px}
+
   /* live preview */
   .preview{margin-top:14px;--hl:#ffff00}
   .pv-scroll{max-height:520px;overflow:auto;border:1px solid var(--line);border-radius:8px}
   table.pv{border-collapse:collapse;font-size:13px;white-space:nowrap}
   table.pv th,table.pv td{border:1px solid var(--line);padding:5px 9px;text-align:left}
-  table.pv thead th{position:sticky;top:0;background:#f0f4f9;z-index:1}
-  table.pv .pv-rn{color:var(--muted);text-align:right;background:#fafbfc;position:sticky;left:0}
+  table.pv thead th{position:sticky;top:0;background:#f4efec;z-index:1}
+  table.pv .pv-rn{color:var(--muted);text-align:right;background:#faf7f5;position:sticky;left:0}
   table.pv tr.hl td{background:var(--hl) !important}
   .pdf-page{position:relative;margin:0 auto 14px;box-shadow:var(--shadow);border:1px solid var(--line)}
   .pdf-page canvas{display:block}
   .pdf-overlay{position:absolute;inset:0;pointer-events:none}
   .pdf-hl{position:absolute;border-radius:2px}
-  .preview-wrap{max-height:640px;overflow:auto}
+
+  .toast{position:fixed;left:50%;bottom:24px;transform:translateX(-50%);background:#2a1b19;color:#fff;
+         padding:10px 16px;border-radius:8px;font-size:14px;box-shadow:var(--shadow);opacity:0;transition:opacity .2s;pointer-events:none;z-index:50}
+  .toast.show{opacity:1}
+  .foot{color:var(--muted);font-size:12px;text-align:center;margin-top:30px}
+  @media (max-width:560px){ .appname{position:static;text-align:left} .topbar{gap:10px} }
 </style>
 </head>
 <body>
-<div class="wrap">
-  <h1>SN Checker</h1>
-  <p class="sub">Scan QR / barcodes, keep the part you choose (<span id="nLabel">last 10 characters</span>) of each,
-     build a table, then highlight matching rows in your Excel sheet — all offline in your browser.</p>
+  <header class="topbar">
+    <div class="brand" aria-label="Zeymos Pharma">
+      <svg viewBox="0 0 168 48" role="img" aria-label="Zeymos Pharma logo">
+        <text x="0" y="23" font-family="Arial Black, Arial, sans-serif" font-weight="900" font-size="21" letter-spacing="1.5" fill="#161311">ZEYMOS</text>
+        <text x="6" y="39" font-family="Arial, sans-serif" font-weight="700" font-size="12" letter-spacing="4" fill="#4a423e">pharma</text>
+        <g fill="#e2001a">
+          <polygon points="112,3 156,3 145,14 101,14"/>
+          <polygon points="120,16 158,16 148,26 110,26"/>
+          <polygon points="60,42 156,42 151,48 55,48"/>
+        </g>
+      </svg>
+    </div>
+    <h1 class="appname">FMD Checker</h1>
+    <button id="howBtn" class="howbtn" type="button"><span class="dot"></span> How it works</button>
+  </header>
 
-  <!-- STEP 1: SCAN -->
-  <div class="card">
-    <h2><span class="step">1</span> Scan codes</h2>
-    <form id="scanForm" autocomplete="off">
-      <div class="scanwrap">
-        <input id="scanBox" type="text" placeholder="Click here, then scan — codes are added automatically…" aria-label="Scan box" autofocus>
-        <button class="primary" type="submit">Add</button>
-      </div>
+  <div id="howPanel" class="howto hidden">
+    <button id="howClose" class="close" type="button" aria-label="Close">&times;</button>
+    <h3>How it works</h3>
+    <ol>
+      <li><b>Upload your table</b> — an Excel <span class="k">.xlsx</span> or a digital <span class="k">.pdf</span>. It appears as a live preview below.</li>
+      <li><b>Set which part of each code to keep</b> — <b>From character number</b> + <b>Number of characters</b> (e.g. from 12, keep 5 → characters 12–16). Leave the count blank to keep to the end.</li>
+      <li><b>Scan.</b> Each matching row lights up <b>live</b> in the preview. Duplicates are skipped by default.</li>
+      <li><b>Download</b> the highlighted copy — a new Excel table (with filters) or a highlighted PDF. Your original file is never changed.</li>
+    </ol>
+    <p class="foot" style="text-align:left;margin-top:12px">Everything runs locally in your browser — no data leaves this page.</p>
+  </div>
+
+  <main class="wrap">
+    <!-- UPLOAD -->
+    <div class="uploadrow">
+      <input id="docFile" type="file" accept=".xlsx,.pdf" class="visually-hidden">
+      <label for="docFile" class="btn btn-primary big">Upload file</label>
+    </div>
+    <div id="docStatus" class="statusline"></div>
+
+    <!-- SCAN -->
+    <form id="scanForm" class="scanwrap" autocomplete="off">
+      <input id="scanBox" type="text" placeholder="Click here, then scan — codes are added automatically…" aria-label="Scan box" autofocus>
     </form>
-    <p class="autohint">✓ Auto-add is on — just scan, no need to press <b>Add</b>. <span class="ver">v4</span></p>
-    <div class="row" style="margin-top:12px">
+    <p class="autohint">✓ Auto-add is on — just scan, no need to press a button. <span class="ver">v5</span></p>
+
+    <div class="settings">
       <div class="field">
-        <label for="startAt">From character #</label>
-        <input id="startAt" type="number" min="1" max="1000" value="1" style="width:130px">
+        <label for="startAt">From character number</label>
+        <input id="startAt" type="number" min="1" max="1000" value="1">
       </div>
       <div class="field">
         <label for="keepLen">Number of characters</label>
-        <input id="keepLen" type="number" min="0" max="1000" value="10" placeholder="blank = to end" style="width:160px">
+        <input id="keepLen" type="number" min="0" max="1000" value="10" placeholder="blank = to end">
       </div>
-      <label class="chk"><input id="skipDup" type="checkbox" checked> Skip duplicate codes</label>
+      <label class="chk"><input id="skipDup" type="checkbox" checked> Skip duplicates</label>
     </div>
-    <p class="autohint" style="color:var(--muted)">e.g. <b>From character 12</b> + <b>5 characters</b> saves characters 12–16. Leave the count blank to save to the end.</p>
+    <p class="hint">Saving <span id="nLabel">last 10 characters</span> of each scan.</p>
+
     <div class="stats">
       <span>Scanned: <b id="countAll">0</b></span>
       <span>Unique codes: <b id="countUnique">0</b></span>
     </div>
-    <div class="tablewrap">
-      <table>
-        <thead><tr><th style="width:36px">#</th><th>Time</th><th>Raw scan</th><th>Code (<span class="nSpan">last 10</span>)</th><th></th></tr></thead>
-        <tbody id="scanBody"><tr><td colspan="5" class="empty">No scans yet. Click the box above and scan a code.</td></tr></tbody>
-      </table>
-    </div>
-    <div class="actions">
-      <button id="copyCodes" type="button">Copy codes</button>
-      <button id="copyTable" type="button">Copy table (for Excel paste)</button>
-      <button id="exportCsv" type="button">Export CSV</button>
-      <button id="clearAll" type="button" class="danger">Clear all</button>
-    </div>
-  </div>
 
-  <!-- STEP 2: LIVE HIGHLIGHT (Excel or PDF) -->
-  <div class="card">
-    <h2><span class="step">2</span> Highlight rows live — Excel or PDF</h2>
-    <p class="sub" style="margin:0 0 12px">
-      Load your table first (<code class="k">.xlsx</code> or a digital <code class="k">.pdf</code>). Then scan:
-      each matching row lights up <b>live</b> below. Download the highlighted copy when you're done — your
-      original file is untouched.</p>
-    <div class="field" style="max-width:460px">
-      <label for="docFile">Table file (.xlsx or .pdf)</label>
-      <input id="docFile" type="file" accept=".xlsx,.pdf">
+    <div class="panel">
+      <div class="tablewrap">
+        <table class="scans">
+          <thead><tr><th style="width:36px">#</th><th>Time</th><th>Raw scan</th><th>Code (<span class="nSpan">last 10</span>)</th><th></th></tr></thead>
+          <tbody id="scanBody"><tr><td colspan="5" class="empty">No scans yet. Click the box above and scan a code.</td></tr></tbody>
+        </table>
+      </div>
+      <div class="actions">
+        <button id="copyCodes" type="button" class="btn">Copy codes</button>
+        <button id="copyTable" type="button" class="btn">Copy table (for Excel paste)</button>
+        <button id="exportCsv" type="button" class="btn">Export CSV</button>
+        <button id="clearAll" type="button" class="btn btn-danger">Clear all</button>
+      </div>
     </div>
 
-    <div id="docControls" class="hidden">
-      <div class="row" style="margin-top:14px">
+    <!-- MATCH CONTROLS + LIVE PREVIEW (appears after a file is loaded) -->
+    <div id="docControls" class="panel hidden">
+      <p class="sectiontitle">Highlighting <span class="tag">live</span></p>
+      <div class="row">
         <div class="field">
           <label for="matchMode">Match when</label>
           <select id="matchMode">
@@ -176,7 +239,7 @@
         </div>
         <div class="row" style="margin-top:10px">
           <label class="chk"><input id="formatTable" type="checkbox" checked> Format the exported sheet as an Excel table (filters + header)</label>
-          <label class="chk"><input id="wholeRow" type="checkbox" checked> Highlight the whole row (not just the cell)</label>
+          <label class="chk"><input id="wholeRow" type="checkbox" checked> Highlight the whole row</label>
           <label class="chk"><input id="stripBanding" type="checkbox" checked> No banded row colours</label>
           <label class="chk"><input id="trimSpaces" type="checkbox" checked> Ignore leading/trailing spaces</label>
         </div>
@@ -184,23 +247,21 @@
 
       <!-- PDF-only note -->
       <div id="pdfOpts" class="hidden">
-        <p class="autohint" style="color:var(--muted);margin-top:10px">
+        <p class="hint" style="text-align:left;margin-top:10px">
           PDF: each row is highlighted wherever a scanned code appears in its line of text. Works on
           digital PDFs with selectable text (not scanned images).</p>
       </div>
 
-      <div id="matchSummary" class="report" style="margin-top:12px"></div>
-      <div class="actions">
-        <button id="downloadBtn" type="button" class="primary">Download highlighted file</button>
+      <div id="matchSummary" class="report"></div>
+      <div class="actions" style="justify-content:flex-start">
+        <button id="downloadBtn" type="button" class="btn btn-primary">Download highlighted file</button>
       </div>
       <div id="preview" class="preview"></div>
     </div>
-    <div id="docStatus"></div>
-  </div>
 
-  <p class="foot">Everything runs locally. No data leaves this page — it never contacts any website.</p>
-</div>
-<div id="toast" class="toast"></div>
+    <p class="foot">FMD Checker · runs entirely in your browser · nothing is uploaded.</p>
+  </main>
+  <div id="toast" class="toast"></div>
 
 <script id="pdfWorker" type="text/js-worker">
 /**
@@ -924,6 +985,11 @@ https://github.com/nodeca/pako/blob/main/LICENSE
     preview.style.setProperty("--hl", $("hlColor").value);
     if(docType==="pdf") refreshPdfHighlights();
   });
+
+  // ---- How it works panel ----
+  var howBtn=$("howBtn"), howPanel=$("howPanel"), howClose=$("howClose");
+  if(howBtn && howPanel) howBtn.addEventListener("click", function(){ howPanel.classList.toggle("hidden"); });
+  if(howClose && howPanel) howClose.addEventListener("click", function(){ howPanel.classList.add("hidden"); });
 
   // ---- init ----
   loadSettings();

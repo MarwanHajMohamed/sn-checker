@@ -1,8 +1,13 @@
-# SN Checker
+# FMD Checker
 
-An offline tool for scanning QR / barcodes, keeping the part of each code you
-choose, building a table of them, and then **highlighting the matching rows** in
-your **Excel sheet or PDF table** — live, as you scan.
+An offline tool (Zeymos Pharma) for scanning QR / barcodes, keeping the part of
+each code you choose, and **highlighting the matching rows** in your **Excel
+sheet or PDF table** — live, as you scan.
+
+> The page carries the FMD Checker / Zeymos Pharma theme. The logo is an inline
+> SVG recreation of the Zeymos wordmark; drop in the exact logo file if you want
+> it pixel-perfect (replace the `<svg>` inside the `.brand` element, or embed the
+> image as a `data:` URI so the page stays a single offline file).
 
 Everything runs locally in your browser. Nothing is uploaded and the page never
 contacts any website — you can use it with the network unplugged.
