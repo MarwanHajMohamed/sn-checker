@@ -96,6 +96,16 @@
 
   .panel{background:var(--surface);border:1px solid var(--line);border-radius:var(--radius);
          box-shadow:var(--shadow);padding:16px 16px;margin:18px 0 0}
+  .tables-2col{display:flex;gap:16px;align-items:flex-start;margin-top:14px}
+  .tables-2col>.panel{flex:1 1 0;min-width:0;margin:0}
+  @media (max-width:760px){ .tables-2col{flex-direction:column} }
+  .panel.accent-ok{border-top:3px solid var(--ok)}
+  .panel.accent-bad{border-top:3px solid var(--brand)}
+  .ttl{display:inline-flex;align-items:center;gap:8px}
+  .statusdot{width:9px;height:9px;border-radius:50%;display:inline-block}
+  .statusdot.ok{background:var(--ok)} .statusdot.bad{background:var(--brand)}
+  .cnt{font-size:12px;font-weight:700;padding:1px 9px;border-radius:20px}
+  .cnt.ok{background:var(--ok-bg);color:var(--ok)} .cnt.bad{background:#fbeff0;color:var(--brand)}
   .panel-head{width:100%;display:flex;align-items:center;justify-content:space-between;
               background:none;border:none;cursor:pointer;font:700 15px/1 inherit;color:var(--ink);padding:2px}
   .panel-head .chev{color:var(--muted);transition:transform .15s;font-size:14px}
@@ -209,25 +219,45 @@
       <span>Scanned: <b id="countAll">0</b></span>
     </div>
 
-    <div class="panel" id="scansPanel">
-      <button id="scansToggle" class="panel-head" type="button" aria-expanded="true" aria-controls="scansCollapse">
-        <span>Scanned codes</span>
-        <span class="chev" aria-hidden="true">▾</span>
-      </button>
-      <div id="scansCollapse" class="collapsible">
-        <div class="tablewrap scan-scroll">
-          <table class="scans">
-            <thead><tr><th style="width:36px">#</th><th>Time</th><th>Raw scan</th><th>Code (<span class="nSpan">last 10</span>)</th><th></th></tr></thead>
-            <tbody id="scanBody"><tr><td colspan="5" class="empty">No scans yet. Click the box above and scan a code.</td></tr></tbody>
-          </table>
-        </div>
-        <div class="actions">
-          <button id="copyCodes" type="button" class="btn">Copy codes</button>
-          <button id="copyTable" type="button" class="btn">Copy table (for Excel paste)</button>
-          <button id="exportCsv" type="button" class="btn">Export CSV</button>
-          <button id="clearAll" type="button" class="btn btn-danger">Clear all</button>
+    <p id="verifyHint" class="hint hidden">Upload your FMD sheet above to check scans against it. Until then, scans stay under “Potentially falsified”.</p>
+
+    <div id="scansArea" class="tables-2col">
+      <div class="panel accent-ok" id="verifiedPanel">
+        <button class="panel-head" type="button" aria-expanded="true">
+          <span class="ttl"><span class="statusdot ok"></span> Verified <span class="cnt ok" id="verifiedCount">0</span></span>
+          <span class="chev" aria-hidden="true">▾</span>
+        </button>
+        <div class="collapsible">
+          <div class="tablewrap scan-scroll">
+            <table class="scans">
+              <thead><tr><th style="width:34px">#</th><th>Time</th><th>Raw scan</th><th>Code (<span class="nSpan">last 10</span>)</th><th></th></tr></thead>
+              <tbody id="verifiedBody"><tr><td colspan="5" class="empty">No scans yet.</td></tr></tbody>
+            </table>
+          </div>
         </div>
       </div>
+
+      <div class="panel accent-bad" id="falsifiedPanel">
+        <button class="panel-head" type="button" aria-expanded="true">
+          <span class="ttl"><span class="statusdot bad"></span> Potentially falsified <span class="cnt bad" id="falsifiedCount">0</span></span>
+          <span class="chev" aria-hidden="true">▾</span>
+        </button>
+        <div class="collapsible">
+          <div class="tablewrap scan-scroll">
+            <table class="scans">
+              <thead><tr><th style="width:34px">#</th><th>Time</th><th>Raw scan</th><th>Code (<span class="nSpan">last 10</span>)</th><th></th></tr></thead>
+              <tbody id="falsifiedBody"><tr><td colspan="5" class="empty">No scans yet.</td></tr></tbody>
+            </table>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <div class="actions" style="justify-content:center">
+      <button id="copyCodes" type="button" class="btn">Copy codes</button>
+      <button id="copyTable" type="button" class="btn">Copy table (for Excel paste)</button>
+      <button id="exportCsv" type="button" class="btn">Export CSV</button>
+      <button id="clearAll" type="button" class="btn btn-danger">Clear all</button>
     </div>
 
     <!-- MATCH CONTROLS + LIVE PREVIEW (appears after a file is loaded) -->
@@ -412,12 +442,16 @@ https://github.com/nodeca/pako/blob/main/LICENSE
 
   // ---- state ----
   var scans = [];        // {raw, code, time}  (time = ISO string)
+  var verifiedSet = new Set(); // codes confirmed present in the loaded FMD document
   var workbook = null;   // ExcelJS workbook
   var loadedFileName = "";
 
   // ---- elements ----
   var $ = function(id){ return document.getElementById(id); };
-  var scanForm=$("scanForm"), scanBox=$("scanBox"), scanBody=$("scanBody");
+  var scanForm=$("scanForm"), scanBox=$("scanBox");
+  var verifiedBody=$("verifiedBody"), falsifiedBody=$("falsifiedBody");
+  var verifiedCount=$("verifiedCount"), falsifiedCount=$("falsifiedCount");
+  var verifyHint=$("verifyHint"), scansArea=$("scansArea");
   var startAt=$("startAt"), keepLen=$("keepLen"), skipDup=$("skipDup");
   var countAll=$("countAll"), countUnique=$("countUnique");
   var toast=$("toast");
@@ -497,32 +531,43 @@ https://github.com/nodeca/pako/blob/main/LICENSE
     var spans = document.querySelectorAll(".nSpan");
     for(var i=0;i<spans.length;i++) spans[i].textContent = ruleText(true);
   }
+  function rowHtml(s, n, i, dup){
+    return '<tr>' +
+      '<td>'+n+'</td>' +
+      '<td>'+esc(fmtTime(s.time))+'</td>' +
+      '<td class="raw" title="'+esc(s.raw)+'">'+esc(s.raw)+'</td>' +
+      '<td class="code">'+esc(s.code)+ (dup ? ' <span class="badge dup">dup</span>' : '') +'</td>' +
+      '<td><button class="del" data-i="'+i+'" title="Remove">&times;</button></td>' +
+    '</tr>';
+  }
+  // split scans into Verified (in the FMD sheet) vs Potentially falsified (not found)
   function render(){
     var codeCounts = Object.create(null);
     scans.forEach(function(s){ codeCounts[s.code] = (codeCounts[s.code]||0)+1; });
 
-    if(scans.length === 0){
-      scanBody.innerHTML = '<tr><td colspan="5" class="empty">No scans yet. Click the box above and scan a code.</td></tr>';
-    } else {
-      var rows = [];
-      for(var i=0;i<scans.length;i++){
-        var s = scans[i];
-        var dup = codeCounts[s.code] > 1;
-        rows.push(
-          '<tr>' +
-            '<td>'+(i+1)+'</td>' +
-            '<td>'+esc(fmtTime(s.time))+'</td>' +
-            '<td class="raw" title="'+esc(s.raw)+'">'+esc(s.raw)+'</td>' +
-            '<td class="code">'+esc(s.code)+ (dup ? ' <span class="badge dup">dup</span>' : '') +'</td>' +
-            '<td><button class="del" data-i="'+i+'" title="Remove">&times;</button></td>' +
-          '</tr>'
-        );
-      }
-      scanBody.innerHTML = rows.join("");
+    var vRows=[], fRows=[];
+    for(var i=0;i<scans.length;i++){
+      var s = scans[i];
+      var dup = codeCounts[s.code] > 1;
+      if(verifiedSet.has(s.code)) vRows.push(rowHtml(s, vRows.length+1, i, dup));
+      else fRows.push(rowHtml(s, fRows.length+1, i, dup));
     }
+    var loaded = !!docType;
+    verifiedBody.innerHTML = vRows.length ? vRows.join("") :
+      '<tr><td colspan="5" class="empty">' +
+      (scans.length===0 ? "No scans yet." : (loaded ? "No matches in the sheet yet." : "Upload your FMD sheet to verify scans.")) +
+      '</td></tr>';
+    falsifiedBody.innerHTML = fRows.length ? fRows.join("") :
+      '<tr><td colspan="5" class="empty">' +
+      (scans.length===0 ? "No scans yet." : "None - every scanned code is in the sheet.") +
+      '</td></tr>';
+    if(verifiedCount) verifiedCount.textContent = vRows.length;
+    if(falsifiedCount) falsifiedCount.textContent = fRows.length;
+    if(verifyHint) verifyHint.classList.toggle("hidden", loaded || scans.length===0);
     countAll.textContent = scans.length;
     if(countUnique) countUnique.textContent = uniqueCodes().length;
   }
+  function statusOf(code){ return verifiedSet.has(code) ? "Verified" : (docType ? "Not found" : "Unverified"); }
 
   // ---- scan handling ----
   function addScan(rawValue){
@@ -578,7 +623,7 @@ https://github.com/nodeca/pako/blob/main/LICENSE
     scanBox.focus();
   });
 
-  scanBody.addEventListener("click", function(e){
+  scansArea.addEventListener("click", function(e){
     var btn = e.target.closest(".del");
     if(!btn) return;
     var i = parseInt(btn.getAttribute("data-i"), 10);
@@ -610,14 +655,14 @@ https://github.com/nodeca/pako/blob/main/LICENSE
   });
   $("copyTable").addEventListener("click", function(){
     if(!scans.length){ showToast("Nothing to copy"); return; }
-    var lines = ["Time\tRaw scan\tCode"];
-    scans.forEach(function(s){ lines.push(fmtTime(s.time)+"\t"+s.raw+"\t"+s.code); });
+    var lines = ["Time\tRaw scan\tCode\tStatus"];
+    scans.forEach(function(s){ lines.push(fmtTime(s.time)+"\t"+s.raw+"\t"+s.code+"\t"+statusOf(s.code)); });
     copyText(lines.join("\n"), "Table copied - paste into Excel");
   });
   $("exportCsv").addEventListener("click", function(){
     if(!scans.length){ showToast("Nothing to export"); return; }
-    var rows = [["Time","Raw scan","Code"]];
-    scans.forEach(function(s){ rows.push([fmtTime(s.time), s.raw, s.code]); });
+    var rows = [["Time","Raw scan","Code","Status"]];
+    scans.forEach(function(s){ rows.push([fmtTime(s.time), s.raw, s.code, statusOf(s.code)]); });
     var csv = rows.map(function(r){
       return r.map(function(c){ c = String(c); return /[",\n]/.test(c) ? '"'+c.replace(/"/g,'""')+'"' : c; }).join(",");
     }).join("\r\n");
@@ -703,6 +748,7 @@ https://github.com/nodeca/pako/blob/main/LICENSE
     docType=null; workbook=null; pdfBytesForSave=null; pdfPages=[]; xlsxRowEls=null;
     preview.innerHTML=""; matchSummary.innerHTML="";
     docControls.classList.add("hidden"); xlsxOpts.classList.add("hidden"); pdfOpts.classList.add("hidden");
+    verifiedSet = new Set(); render();  // nothing loaded -> nothing verified
   }
 
   function updateSummary(matchedCodes, rowCount){
@@ -814,6 +860,9 @@ https://github.com/nodeca/pako/blob/main/LICENSE
     var res=xlsxCompute();
     xlsxRowEls.forEach(function(tr, rn){ tr.classList.toggle("hl", res.rows.has(rn)); });
     updateSummary(res.foundNorms.size, res.rows.size);
+    verifiedSet = new Set();
+    uniqueCodes().forEach(function(c){ if(res.foundNorms.has(normalize(c))) verifiedSet.add(c); });
+    render();  // move scans between Verified / Potentially falsified
   }
   // Wrap the sheet's data range in a real Excel Table (filter/sort header).
   // addTable rewrites the data cells, so this MUST run before highlights.
@@ -978,6 +1027,9 @@ https://github.com/nodeca/pako/blob/main/LICENSE
       });
     });
     updateSummary(found.size, rowCount);
+    verifiedSet = new Set();
+    uniqueCodes().forEach(function(c){ if(found.has(normStrong(c))) verifiedSet.add(c); });
+    render();  // move scans between Verified / Potentially falsified
   }
   function downloadPdf(){
     if(!window.PDFLib || !pdfBytesForSave){ showToast("PDF is not ready"); return; }
@@ -1024,14 +1076,13 @@ https://github.com/nodeca/pako/blob/main/LICENSE
     if(e.key==="Escape" && howPanel && !howPanel.classList.contains("hidden")) closeHow();
   });
 
-  // ---- collapsible scans panel ----
-  var scansToggle=$("scansToggle"), scansPanel=$("scansPanel");
-  if(scansToggle && scansPanel){
-    scansToggle.addEventListener("click", function(){
-      var collapsed = scansPanel.classList.toggle("collapsed");
-      scansToggle.setAttribute("aria-expanded", collapsed ? "false" : "true");
-    });
-  }
+  // ---- collapsible panels (any .panel-head toggles its .panel) ----
+  document.addEventListener("click", function(e){
+    var head=e.target.closest(".panel-head"); if(!head) return;
+    var panel=head.closest(".panel"); if(!panel) return;
+    var collapsed=panel.classList.toggle("collapsed");
+    head.setAttribute("aria-expanded", collapsed ? "false" : "true");
+  });
 
   // ---- init ----
   loadSettings();
