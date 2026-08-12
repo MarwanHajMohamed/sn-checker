@@ -120,7 +120,7 @@
   .scan-scroll table.scans th,.scan-scroll table.scans td{border-bottom:none;padding:8px 12px}
   table.scans{width:100%;border-collapse:collapse;font-size:14px}
   table.scans th,table.scans td{text-align:left;padding:8px 10px;border-bottom:1px solid var(--line);vertical-align:top}
-  table.scans th{font-size:12px;text-transform:uppercase;letter-spacing:.04em;color:var(--muted)}
+  table.scans th{font-size:12px;letter-spacing:.02em;color:var(--muted)}
   td.raw{color:var(--muted);max-width:320px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
   td.code{font-family:ui-monospace,SFMono-Regular,Menlo,Consolas,monospace;font-weight:600;letter-spacing:.5px}
   .badge{display:inline-block;font-size:11px;padding:1px 7px;border-radius:20px;font-weight:600;background:#fbeff0;color:var(--brand)}
@@ -230,7 +230,7 @@
         <div class="collapsible">
           <div class="tablewrap scan-scroll">
             <table class="scans">
-              <thead><tr><th style="width:34px">#</th><th>Time</th><th>Raw scan</th><th>Code (<span class="nSpan">last 10</span>)</th><th></th></tr></thead>
+              <thead><tr><th style="width:34px">#</th><th>Time</th><th>Raw scan</th><th>Code</th><th></th></tr></thead>
               <tbody id="verifiedBody"><tr><td colspan="5" class="empty">No scans yet.</td></tr></tbody>
             </table>
           </div>
@@ -245,7 +245,7 @@
         <div class="collapsible">
           <div class="tablewrap scan-scroll">
             <table class="scans">
-              <thead><tr><th style="width:34px">#</th><th>Time</th><th>Raw scan</th><th>Code (<span class="nSpan">last 10</span>)</th><th></th></tr></thead>
+              <thead><tr><th style="width:34px">#</th><th>Time</th><th>Raw scan</th><th>Code</th><th></th></tr></thead>
               <tbody id="falsifiedBody"><tr><td colspan="5" class="empty">No scans yet.</td></tr></tbody>
             </table>
           </div>
