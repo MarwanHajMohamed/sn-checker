@@ -272,13 +272,6 @@
       <p class="sectiontitle">Highlighting <span class="tag">live</span></p>
       <div class="row">
         <div class="field">
-          <label for="matchMode">Match when</label>
-          <select id="matchMode">
-            <option value="contains" selected>Cell/line contains the code</option>
-            <option value="exact">Cell exactly equals the code</option>
-          </select>
-        </div>
-        <div class="field">
           <label for="hlColor">Highlight</label>
           <input id="hlColor" type="color" value="#ffff00" class="hl-color">
         </div>
@@ -910,7 +903,7 @@ https://github.com/nodeca/pako/blob/main/LICENSE
     var out={ rows:new Set(), foundNorms:new Set(), cellsByRow:new Map(), lastCol:1 };
     if(!ws) return out;
     var searchCol=parseInt(colSel.value,10)||0;
-    var mode=$("matchMode").value;
+    var mode="exact";  // always match the code exactly (whole cell)
     var normCodes=uniqueCodes().map(function(c){ return { code:c, norm:normalize(c) }; }).filter(function(o){ return o.norm; });
     var codeSet=Object.create(null); normCodes.forEach(function(o){ codeSet[o.norm]=1; });
     var hr=parseInt(headerRow.value,10)||1;
@@ -1067,62 +1060,105 @@ https://github.com/nodeca/pako/blob/main/LICENSE
   }
 
   // Render the WHOLE loaded Excel sheet to a PDF, with matched rows highlighted.
+  // Render the WHOLE loaded sheet to PDF, mirroring Excel's layout as closely as
+  // an offline renderer can: real column widths / row heights, cell fills, fonts
+  // (bold/size/colour), horizontal alignment, merged cells, and fit-to-width
+  // scaling (like Excel "Fit All Columns on One Page"). Matched rows are shaded.
   function exportXlsxAsPdf(){
     var ws=currentSheet(); if(!ws){ showToast("No sheet loaded"); return; }
     if(!window.PDFLib){ showToast("PDF engine not ready"); return; }
-    var res=xlsxCompute();  // res.rows = matched excel row numbers
-    var hr=parseInt(headerRow.value,10)||1;
-    var maxCol=Math.max(ws.columnCount||0, ws.getRow(hr).cellCount||0, 1);
-    var lastRow=ws.rowCount||0;
-    while(lastRow>hr){ var any=false; for(var c=1;c<=maxCol;c++){ if(cellString(ws.getRow(lastRow).getCell(c)).trim()){ any=true; break; } } if(any) break; lastRow--; }
-    var headers=[]; for(var c=1;c<=maxCol;c++){ headers.push(cellString(ws.getRow(hr).getCell(c))); }
-    var body=[], matchedFlags=[];
-    for(var r=hr+1;r<=lastRow;r++){
-      var arr=[]; for(var c2=1;c2<=maxCol;c2++){ arr.push(cellString(ws.getRow(r).getCell(c2))); }
-      body.push(arr); matchedFlags.push(res.rows.has(r));
+    var res=xlsxCompute();
+    var P=PDFLib;
+    var safe=function(t){ return String(t==null?"":t).replace(/[^\x20-\x7E]/g,"?"); };
+    function argbToRgb(argb){
+      if(!argb || typeof argb!=="string" || argb.length<6) return null;
+      var h = argb.length===8 ? argb.slice(2) : argb;
+      return P.rgb(parseInt(h.slice(0,2),16)/255, parseInt(h.slice(2,4),16)/255, parseInt(h.slice(4,6),16)/255);
     }
-    var P=PDFLib, safe=function(t){ return String(t).replace(/[^\x20-\x7E]/g,"?"); };
+
+    // used range (trim trailing empty rows)
+    var maxCol=Math.max(ws.columnCount||1, 1);
+    var maxRow=ws.rowCount||1;
+    while(maxRow>1){ var any=false; for(var c=1;c<=maxCol;c++){ var v=ws.getRow(maxRow).getCell(c).value; if(v!=null && String(v).trim()!==""){ any=true; break; } } if(any) break; maxRow--; }
+
+    // column widths & row heights in points
+    var colWpt=[], tableW=0;
+    for(var c=1;c<=maxCol;c++){ var col=ws.getColumn(c); var w=(col&&col.width)?col.width:8.43; var wpt=(w*7+5)*0.75; colWpt.push(wpt); tableW+=wpt; }
+    var colXpt=[]; (function(){ var x=0; for(var i=0;i<maxCol;i++){ colXpt.push(x); x+=colWpt[i]; } })();
+    function rowHpt(r){ var row=ws.getRow(r); return (row&&row.height)? row.height : 15; }
+
+    // merges -> master spans + covered set
+    var merges=(ws.model && ws.model.merges) ? ws.model.merges : [];
+    function addrRC(a){ var mm=/^([A-Z]+)(\d+)$/.exec(a); var L=mm[1], r=parseInt(mm[2],10), cc=0; for(var i=0;i<L.length;i++){ cc=cc*26+(L.charCodeAt(i)-64); } return {r:r,c:cc}; }
+    var master={}, covered={};
+    merges.forEach(function(rng){ var pp=rng.split(":"); var a=addrRC(pp[0]), b=addrRC(pp[1]); var r1=Math.min(a.r,b.r),r2=Math.max(a.r,b.r),c1=Math.min(a.c,b.c),c2=Math.max(a.c,b.c);
+      master[r1+"_"+c1]={rs:r2-r1+1, cs:c2-c1+1};
+      for(var r=r1;r<=r2;r++) for(var cc=c1;cc<=c2;cc++) if(!(r===r1&&cc===c1)) covered[r+"_"+cc]=true; });
+
+    // page + fit-to-width scale
+    var landscape = tableW > 720;
+    var Wp=landscape?842:595, Hp=landscape?595:842, mg=28;
+    var contentW=Wp-2*mg;
+    var S=Math.min(1, contentW/tableW);
+    var hlU=hexToUnit($("hlColor").value);
+    var grid=P.rgb(0.82,0.82,0.82), inkDefault=P.rgb(0.1,0.1,0.1);
+
     P.PDFDocument.create().then(function(pdf){
       return Promise.all([pdf.embedFont(P.StandardFonts.Helvetica), pdf.embedFont(P.StandardFonts.HelveticaBold)]).then(function(f){
         var font=f[0], bold=f[1];
-        var landscape = maxCol > 4;
-        var W = landscape?842:595, H = landscape?595:842, m=28;
-        var contentW=W-2*m, fs=8, lh=fs+5, charW=fs*0.52;
-        var weights=[], totalW=0;
-        for(var c=0;c<maxCol;c++){
-          var mx=Math.min(String(headers[c]).length,40);
-          for(var i=0;i<body.length;i++){ var l=String(body[i][c]).length; if(l>mx) mx=Math.min(l,40); }
-          mx=Math.max(mx,3); weights.push(mx); totalW+=mx;
-        }
-        var colW=weights.map(function(w){ return Math.max(26, contentW*w/totalW); });
-        var sum=colW.reduce(function(a,b){return a+b;},0);
-        if(sum>contentW){ var k=contentW/sum; colW=colW.map(function(w){ return w*k; }); }
-        var colX=[], x=m; for(var c2=0;c2<maxCol;c2++){ colX.push(x); x+=colW[c2]; }
-        var rowW=(colX[maxCol-1]+colW[maxCol-1])-m;
-        var hl=hexToUnit($("hlColor").value);
-        var ink=P.rgb(0.12,0.12,0.12);
-        var page,y;
-        function trunc(t,w){ t=safe(t); var mc=Math.max(1,Math.floor(w/charW)-1); return t.length>mc? t.slice(0,mc-1)+"." : t; }
-        function drawHeaderRow(){
-          page.drawRectangle({x:m,y:y-lh+2,width:rowW,height:lh,color:P.rgb(0.93,0.90,0.88)});
-          for(var c=0;c<maxCol;c++){ page.drawText(trunc(headers[c],colW[c]),{x:colX[c]+2,y:y-fs,size:fs,font:bold,color:ink}); }
-          y-=lh;
-        }
-        function newPage(){ page=pdf.addPage([W,H]); y=H-m; }
+        var page, yTop;
+        function newPage(){ page=pdf.addPage([Wp,Hp]); yTop=Hp-mg; }
         newPage();
-        page.drawText(safe(loadedFileName+"  -  highlighted"),{x:m,y:y-11,size:11,font:bold,color:ink}); y-=lh+8;
-        drawHeaderRow();
-        for(var i=0;i<body.length;i++){
-          if(y < m+lh){ newPage(); drawHeaderRow(); }
-          if(matchedFlags[i]){ page.drawRectangle({x:m,y:y-lh+2,width:rowW,height:lh,color:P.rgb(hl.r,hl.g,hl.b),opacity:0.45}); }
-          for(var c=0;c<maxCol;c++){ page.drawText(trunc(body[i][c],colW[c]),{x:colX[c]+2,y:y-fs,size:fs,font:font,color:ink}); }
-          y-=lh;
+        for(var r=1;r<=maxRow;r++){
+          var rh=rowHpt(r)*S;
+          if(yTop-rh < mg){ newPage(); }
+          var yb=yTop-rh;
+          var matched=res.rows.has(r);
+          var cellTexts=[]; for(var tc=1;tc<=maxCol;tc++){ cellTexts[tc]=safe(ws.getRow(r).getCell(tc).text); }
+          for(var c=1;c<=maxCol;c++){
+            var key=r+"_"+c;
+            if(covered[key]) continue;
+            var sp=master[key], cs=sp?sp.cs:1;
+            var cw=0; for(var k=0;k<cs;k++){ cw+=(colWpt[c-1+k]||0); } cw*=S;
+            var xl=mg+colXpt[c-1]*S;
+            var cell=ws.getRow(r).getCell(c);
+            // fill: matched row shading takes priority, else the cell's own fill
+            if(matched){ page.drawRectangle({x:xl,y:yb,width:cw,height:rh,color:P.rgb(hlU.r,hlU.g,hlU.b),opacity:0.5}); }
+            else if(cell.fill && cell.fill.type==="pattern" && cell.fill.fgColor){ var fg=argbToRgb(cell.fill.fgColor.argb); if(fg) page.drawRectangle({x:xl,y:yb,width:cw,height:rh,color:fg}); }
+            // gridline
+            page.drawRectangle({x:xl,y:yb,width:cw,height:rh,borderColor:grid,borderWidth:0.5});
+            // text
+            var txt=cellTexts[c];
+            if(txt){
+              var fnt=(cell.font&&cell.font.bold)?bold:font;
+              var fsz=Math.max(4.5, ((cell.font&&cell.font.size)||11)*S);
+              var col=(cell.font&&cell.font.color&&cell.font.color.argb)?argbToRgb(cell.font.color.argb):inkDefault;
+              var align=(cell.alignment&&cell.alignment.horizontal) || (typeof cell.value==="number"?"right":"left");
+              // Excel-style overflow: left/default text spills into empty cells to the right
+              var availW=cw;
+              if(align!=="right" && align!=="center"){
+                var oc=c+cs;
+                while(oc<=maxCol && !covered[r+"_"+oc] && !master[r+"_"+oc] && !cellTexts[oc]){ availW += colWpt[oc-1]*S; oc++; }
+              }
+              var maxw=availW-4;
+              var est=Math.max(0, Math.floor(maxw/(fsz*0.5)));
+              if(txt.length>est) txt=txt.slice(0,est);
+              while(txt && fnt.widthOfTextAtSize(txt,fsz)>maxw) txt=txt.slice(0,-1);
+              if(txt){
+                var tw=fnt.widthOfTextAtSize(txt,fsz);
+                var xt = align==="right" ? (xl+cw-2-tw) : align==="center" ? (xl+(cw-tw)/2) : (xl+2);
+                var yt = yb + (rh-fsz)/2 + fsz*0.18;
+                page.drawText(txt,{x:xt,y:yt,size:fsz,font:fnt,color:col||inkDefault});
+              }
+            }
+          }
+          yTop=yb;
         }
         return pdf.save();
       });
     }).then(function(bytes){
       downloadBlob(new Blob([bytes],{type:"application/pdf"}), loadedFileName.replace(/\.(xlsx|xls)$/i,"")+"-highlighted.pdf");
-      showToast("PDF exported ("+body.length+" rows, "+res.rows.size+" highlighted)");
+      showToast("PDF exported ("+res.rows.size+" highlighted)");
     }).catch(function(err){ statusMsg("PDF export failed: "+esc(err&&err.message||err), "note"); });
   }
 
@@ -1132,7 +1168,7 @@ https://github.com/nodeca/pako/blob/main/LICENSE
     else if(docType==="pdf") downloadPdf();
     else showToast("Load a file first");
   });
-  ["matchMode","ignoreCase","colSel"].forEach(function(id){
+  ["ignoreCase","colSel"].forEach(function(id){
     var el=$(id); if(el) el.addEventListener("change", refreshHighlights);
   });
   $("hlColor").addEventListener("input", function(){
