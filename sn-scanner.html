@@ -184,7 +184,7 @@
         <li><b>Upload your table</b> - an Excel <span class="k">.xlsx</span> or a digital <span class="k">.pdf</span>.</li>
         <li><b>Set which part of each code to keep</b> - <b>From character number</b> + <b>Number of characters</b> (e.g. from 12, keep 5 → characters 12–16).</li>
         <li><b>Scan.</b> Each matching row lights up <b>live</b> in the preview. Duplicates are skipped by default.</li>
-        <li><b>Download</b> the highlighted copy.</li>
+        <li><b>Export</b> the whole highlighted report as Excel or PDF.</li>
       </ol>
       <p class="modal-foot">Everything runs locally in your browser - no data leaves this page.</p>
     </div>
@@ -311,9 +311,7 @@
       </div>
 
       <div id="matchSummary" class="report"></div>
-      <div class="actions" style="justify-content:flex-start">
-        <button id="downloadBtn" type="button" class="btn btn-primary">Download highlighted file</button>
-      </div>
+      <p class="hint" style="text-align:left">Use <b>Export</b> (above) to save the whole report with these highlights as Excel or PDF.</p>
       <div id="preview" class="preview"></div>
     </div>
 
@@ -726,7 +724,20 @@ https://github.com/nodeca/pako/blob/main/LICENSE
   }
 
   $("exportBtn").addEventListener("click", function(){
-    if($("exportFormat").value === "pdf") exportScansPdf(); else exportScansExcel();
+    var fmt = $("exportFormat").value;
+    if(!docType){
+      // no FMD report loaded -> export the scan list in the chosen format
+      if(fmt === "pdf") exportScansPdf(); else exportScansExcel();
+      return;
+    }
+    // a report is loaded -> export the WHOLE report with highlights
+    if(fmt === "pdf"){
+      if(docType === "pdf") downloadPdf();      // source already a PDF: bands on the whole PDF
+      else exportXlsxAsPdf();                    // render the whole Excel table to a highlighted PDF
+    } else {
+      if(docType === "xlsx") downloadXlsx();     // whole highlighted workbook
+      else { showToast("Loaded report is a PDF - exporting the scan list"); exportScansExcel(); }
+    }
   });
   $("clearAll").addEventListener("click", function(){
     if(!scans.length) return;
@@ -1055,8 +1066,68 @@ https://github.com/nodeca/pako/blob/main/LICENSE
     }).catch(function(err){ statusMsg("Could not write the PDF: "+esc(err.message||err), "note"); });
   }
 
+  // Render the WHOLE loaded Excel sheet to a PDF, with matched rows highlighted.
+  function exportXlsxAsPdf(){
+    var ws=currentSheet(); if(!ws){ showToast("No sheet loaded"); return; }
+    if(!window.PDFLib){ showToast("PDF engine not ready"); return; }
+    var res=xlsxCompute();  // res.rows = matched excel row numbers
+    var hr=parseInt(headerRow.value,10)||1;
+    var maxCol=Math.max(ws.columnCount||0, ws.getRow(hr).cellCount||0, 1);
+    var lastRow=ws.rowCount||0;
+    while(lastRow>hr){ var any=false; for(var c=1;c<=maxCol;c++){ if(cellString(ws.getRow(lastRow).getCell(c)).trim()){ any=true; break; } } if(any) break; lastRow--; }
+    var headers=[]; for(var c=1;c<=maxCol;c++){ headers.push(cellString(ws.getRow(hr).getCell(c))); }
+    var body=[], matchedFlags=[];
+    for(var r=hr+1;r<=lastRow;r++){
+      var arr=[]; for(var c2=1;c2<=maxCol;c2++){ arr.push(cellString(ws.getRow(r).getCell(c2))); }
+      body.push(arr); matchedFlags.push(res.rows.has(r));
+    }
+    var P=PDFLib, safe=function(t){ return String(t).replace(/[^\x20-\x7E]/g,"?"); };
+    P.PDFDocument.create().then(function(pdf){
+      return Promise.all([pdf.embedFont(P.StandardFonts.Helvetica), pdf.embedFont(P.StandardFonts.HelveticaBold)]).then(function(f){
+        var font=f[0], bold=f[1];
+        var landscape = maxCol > 4;
+        var W = landscape?842:595, H = landscape?595:842, m=28;
+        var contentW=W-2*m, fs=8, lh=fs+5, charW=fs*0.52;
+        var weights=[], totalW=0;
+        for(var c=0;c<maxCol;c++){
+          var mx=Math.min(String(headers[c]).length,40);
+          for(var i=0;i<body.length;i++){ var l=String(body[i][c]).length; if(l>mx) mx=Math.min(l,40); }
+          mx=Math.max(mx,3); weights.push(mx); totalW+=mx;
+        }
+        var colW=weights.map(function(w){ return Math.max(26, contentW*w/totalW); });
+        var sum=colW.reduce(function(a,b){return a+b;},0);
+        if(sum>contentW){ var k=contentW/sum; colW=colW.map(function(w){ return w*k; }); }
+        var colX=[], x=m; for(var c2=0;c2<maxCol;c2++){ colX.push(x); x+=colW[c2]; }
+        var rowW=(colX[maxCol-1]+colW[maxCol-1])-m;
+        var hl=hexToUnit($("hlColor").value);
+        var ink=P.rgb(0.12,0.12,0.12);
+        var page,y;
+        function trunc(t,w){ t=safe(t); var mc=Math.max(1,Math.floor(w/charW)-1); return t.length>mc? t.slice(0,mc-1)+"." : t; }
+        function drawHeaderRow(){
+          page.drawRectangle({x:m,y:y-lh+2,width:rowW,height:lh,color:P.rgb(0.93,0.90,0.88)});
+          for(var c=0;c<maxCol;c++){ page.drawText(trunc(headers[c],colW[c]),{x:colX[c]+2,y:y-fs,size:fs,font:bold,color:ink}); }
+          y-=lh;
+        }
+        function newPage(){ page=pdf.addPage([W,H]); y=H-m; }
+        newPage();
+        page.drawText(safe(loadedFileName+"  -  highlighted"),{x:m,y:y-11,size:11,font:bold,color:ink}); y-=lh+8;
+        drawHeaderRow();
+        for(var i=0;i<body.length;i++){
+          if(y < m+lh){ newPage(); drawHeaderRow(); }
+          if(matchedFlags[i]){ page.drawRectangle({x:m,y:y-lh+2,width:rowW,height:lh,color:P.rgb(hl.r,hl.g,hl.b),opacity:0.45}); }
+          for(var c=0;c<maxCol;c++){ page.drawText(trunc(body[i][c],colW[c]),{x:colX[c]+2,y:y-fs,size:fs,font:font,color:ink}); }
+          y-=lh;
+        }
+        return pdf.save();
+      });
+    }).then(function(bytes){
+      downloadBlob(new Blob([bytes],{type:"application/pdf"}), loadedFileName.replace(/\.(xlsx|xls)$/i,"")+"-highlighted.pdf");
+      showToast("PDF exported ("+body.length+" rows, "+res.rows.size+" highlighted)");
+    }).catch(function(err){ statusMsg("PDF export failed: "+esc(err&&err.message||err), "note"); });
+  }
+
   // ---- shared controls ----
-  downloadBtn.addEventListener("click", function(){
+  if(downloadBtn) downloadBtn.addEventListener("click", function(){
     if(docType==="xlsx") downloadXlsx();
     else if(docType==="pdf") downloadPdf();
     else showToast("Load a file first");
