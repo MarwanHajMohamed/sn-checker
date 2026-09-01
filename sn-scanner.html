@@ -77,6 +77,7 @@
            transition:background .1s,border-color .1s,box-shadow .1s}
   #scanBox:focus{outline:none;border-color:var(--brand);box-shadow:0 0 0 3px rgba(138,17,22,.15)}
   #scanBox.flash{background:var(--ok-bg);border-color:var(--ok)}
+  #scanBox.flash-bad{background:#fbeef0;border-color:var(--brand)}
   .autohint{max-width:660px;margin:10px auto 0;font-size:13px;color:var(--ok);text-align:center}
   .autohint .ver{color:var(--muted);font-weight:700;margin-left:6px}
 
@@ -212,6 +213,7 @@
         <input id="keepLen" type="number" min="0" max="1000" value="10" placeholder="blank = to end">
       </div>
       <label class="chk"><input id="skipDup" type="checkbox" checked> Skip duplicates</label>
+      <label class="chk"><input id="soundAlert" type="checkbox" checked> Alert sound if not verified</label>
     </div>
     <p class="hint">Saving <span id="nLabel">last 10 characters</span> of each scan.</p>
 
@@ -452,7 +454,7 @@ https://github.com/nodeca/pako/blob/main/LICENSE
   var verifiedBody=$("verifiedBody"), falsifiedBody=$("falsifiedBody");
   var verifiedCount=$("verifiedCount"), falsifiedCount=$("falsifiedCount");
   var verifyHint=$("verifyHint"), scansArea=$("scansArea");
-  var startAt=$("startAt"), keepLen=$("keepLen"), skipDup=$("skipDup");
+  var startAt=$("startAt"), keepLen=$("keepLen"), skipDup=$("skipDup"), soundAlert=$("soundAlert");
   var countAll=$("countAll"), countUnique=$("countUnique");
   var toast=$("toast");
 
@@ -460,6 +462,27 @@ https://github.com/nodeca/pako/blob/main/LICENSE
   function showToast(msg){
     toast.textContent = msg; toast.classList.add("show");
     clearTimeout(toast._t); toast._t = setTimeout(function(){ toast.classList.remove("show"); }, 1600);
+  }
+  // Synthesised alert (no external audio file) for a potentially-falsified scan.
+  var audioCtx = null;
+  function beepAlert(){
+    try{
+      var AC = window.AudioContext || window.webkitAudioContext;
+      if(!AC) return;
+      if(!audioCtx) audioCtx = new AC();
+      if(audioCtx.state === "suspended") audioCtx.resume();
+      var t0 = audioCtx.currentTime;
+      function tone(freq, start, dur){
+        var o = audioCtx.createOscillator(), g = audioCtx.createGain();
+        o.type = "square"; o.frequency.value = freq;
+        g.gain.setValueAtTime(0.0001, t0 + start);
+        g.gain.exponentialRampToValueAtTime(0.3, t0 + start + 0.012);
+        g.gain.exponentialRampToValueAtTime(0.0001, t0 + start + dur);
+        o.connect(g); g.connect(audioCtx.destination);
+        o.start(t0 + start); o.stop(t0 + start + dur + 0.02);
+      }
+      tone(880, 0, 0.16); tone(620, 0.18, 0.30); // two descending buzzes
+    }catch(e){}
   }
   function startCharPos(){
     var s = parseInt(startAt.value, 10);
@@ -505,7 +528,8 @@ https://github.com/nodeca/pako/blob/main/LICENSE
   }
   function saveSettings(){
     try{ localStorage.setItem(SETTINGS_KEY, JSON.stringify({
-      start:startCharPos(), len:keepLenVal(), skipDup:skipDup.checked
+      start:startCharPos(), len:keepLenVal(), skipDup:skipDup.checked,
+      sound:soundAlert ? soundAlert.checked : true
     })); }catch(e){}
   }
   function loadSettings(){
@@ -514,6 +538,7 @@ https://github.com/nodeca/pako/blob/main/LICENSE
       if(s.start){ startAt.value = s.start; }
       if(typeof s.len === "number"){ keepLen.value = s.len > 0 ? s.len : ""; }
       if(typeof s.skipDup === "boolean"){ skipDup.checked = s.skipDup; }
+      if(soundAlert && typeof s.sound === "boolean"){ soundAlert.checked = s.sound; }
     }catch(e){}
   }
 
@@ -582,9 +607,17 @@ https://github.com/nodeca/pako/blob/main/LICENSE
     }
     scans.push({ raw:raw, code:code, time:new Date().toISOString() });
     save(); render(); refreshHighlights();
-    showToast("Added: " + code);
-    scanBox.classList.add("flash");
-    setTimeout(function(){ scanBox.classList.remove("flash"); }, 150);
+    // after refreshHighlights, verifiedSet reflects the just-added code
+    var falsified = docType && !verifiedSet.has(code);
+    if(falsified){
+      showToast("⚠ Not in FMD sheet: " + code);
+      if(!soundAlert || soundAlert.checked) beepAlert();
+    } else {
+      showToast("Added: " + code);
+    }
+    var cls = falsified ? "flash-bad" : "flash";
+    scanBox.classList.add(cls);
+    setTimeout(function(){ scanBox.classList.remove(cls); }, 250);
   }
 
   // Commit the current scan box contents. Called both when the scanner sends
@@ -634,6 +667,7 @@ https://github.com/nodeca/pako/blob/main/LICENSE
   startAt.addEventListener("change", function(){ updateNLabels(); saveSettings(); });
   keepLen.addEventListener("input", function(){ updateNLabels(); saveSettings(); });
   skipDup.addEventListener("change", saveSettings);
+  if(soundAlert) soundAlert.addEventListener("change", saveSettings);
 
   // ---- table actions ----
   function copyText(text, msg){
